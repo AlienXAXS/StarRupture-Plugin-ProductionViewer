@@ -1,0 +1,5 @@
+LIBRARY ProductionViewer
+EXPORTS
+    GetPluginInfo
+    PluginInit
+    PluginShutdown
