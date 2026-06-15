@@ -1,7 +1,7 @@
 #include "production_ui.h"
 #include "production_data.h"
-#include "plugin_helpers.h"
-#include "plugin_config.h"
+#include "Plugin Core/Helpers/plugin_helpers.h"
+#include "Plugin Core/Config/plugin_config.h"
 
 #include <algorithm>
 #include <array>

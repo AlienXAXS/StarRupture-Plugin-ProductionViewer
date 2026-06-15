@@ -57,7 +57,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <ModuleDefinitionFile>$(ProjectDir)ProductionViewer.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>$(ProjectDir)Plugin Core\ProductionViewer.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <!-- ===== Client Release compiler settings ===== -->
@@ -80,7 +80,7 @@
       <EnableUAC>false</EnableUAC>
       <EnableCOMDATFolding>false</EnableCOMDATFolding>
       <OptimizeReferences>false</OptimizeReferences>
-      <ModuleDefinitionFile>$(ProjectDir)ProductionViewer.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>$(ProjectDir)Plugin Core\ProductionViewer.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <!-- ===== Source files ===== -->
@@ -94,21 +94,21 @@
     <ClCompile Include="$(StarRuptureSDKSourceDir)Engine_functions.cpp">
       <Visible>false</Visible>
     </ClCompile>
-    <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="plugin.cpp" />
-    <ClCompile Include="plugin_config.cpp" />
-    <ClCompile Include="production_data.cpp" />
-    <ClCompile Include="production_ui.cpp" />
+    <ClCompile Include="Plugin Core\dllmain.cpp" />
+    <ClCompile Include="Plugin Core\plugin.cpp" />
+    <ClCompile Include="Plugin Core\Config\plugin_config.cpp" />
+    <ClCompile Include="Production Viewer\production_data.cpp" />
+    <ClCompile Include="Production Viewer\production_ui.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="plugin.h" />
-    <ClInclude Include="plugin_config.h" />
-    <ClInclude Include="plugin_helpers.h" />
-    <ClInclude Include="production_data.h" />
-    <ClInclude Include="production_ui.h" />
+    <ClInclude Include="Plugin Core\plugin.h" />
+    <ClInclude Include="Plugin Core\Config\plugin_config.h" />
+    <ClInclude Include="Plugin Core\Helpers\plugin_helpers.h" />
+    <ClInclude Include="Production Viewer\production_data.h" />
+    <ClInclude Include="Production Viewer\production_ui.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="ProductionViewer.def" />
+    <None Include="Plugin Core\ProductionViewer.def" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
