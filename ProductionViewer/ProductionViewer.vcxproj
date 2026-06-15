@@ -94,17 +94,32 @@
     <ClCompile Include="$(StarRuptureSDKSourceDir)Engine_functions.cpp">
       <Visible>false</Visible>
     </ClCompile>
+    <ClCompile Include="$(StarRuptureSDKSourceDir)AuCrafting_functions.cpp">
+      <Visible>false</Visible>
+    </ClCompile>
     <ClCompile Include="Plugin Core\dllmain.cpp" />
     <ClCompile Include="Plugin Core\plugin.cpp" />
     <ClCompile Include="Plugin Core\Config\plugin_config.cpp" />
-    <ClCompile Include="Production Viewer\production_data.cpp" />
+    <ClCompile Include="Plugin Core\Storage\production_storage.cpp" />
+    <ClCompile Include="Production Viewer\production_timeseries.cpp" />
+    <ClCompile Include="Production Viewer\production_tracker.cpp" />
+    <ClCompile Include="Production Viewer\production_icons.cpp" />
+    <ClCompile Include="Production Viewer\production_mass.cpp" />
     <ClCompile Include="Production Viewer\production_ui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Plugin Core\plugin.h" />
     <ClInclude Include="Plugin Core\Config\plugin_config.h" />
     <ClInclude Include="Plugin Core\Helpers\plugin_helpers.h" />
+    <ClInclude Include="Plugin Core\Signatures\plugin_signatures.h" />
+    <ClInclude Include="Plugin Core\Storage\production_storage.h" />
+    <ClInclude Include="Plugin Core\Vendor\json.hpp" />
+    <ClInclude Include="Plugin Core\Vendor\json_fwd.hpp" />
     <ClInclude Include="Production Viewer\production_data.h" />
+    <ClInclude Include="Production Viewer\production_timeseries.h" />
+    <ClInclude Include="Production Viewer\production_tracker.h" />
+    <ClInclude Include="Production Viewer\production_icons.h" />
+    <ClInclude Include="Production Viewer\production_mass.h" />
     <ClInclude Include="Production Viewer\production_ui.h" />
   </ItemGroup>
   <ItemGroup>

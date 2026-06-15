@@ -1,13 +1,19 @@
 #include "production_ui.h"
 #include "production_data.h"
+#include "production_tracker.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
 #include "Plugin Core/Config/plugin_config.h"
 
+#include "Engine_classes.hpp"
+
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cfloat>
+#include <chrono>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 namespace ProductionUI
 {
@@ -22,8 +28,96 @@ namespace ProductionUI
 		bool g_panelOpen = false;
 
 		int s_selectedRangeIndex = 1; // default to "1m"
-		bool s_globalStatsProduction = false;
-		bool s_globalStatsConsumption = false;
+
+		// Search bar text (comma-separated, matched against item names in both
+		// the Production and Consumption columns).
+		char s_searchBuffer[128] = "";
+
+		// How often the item table/graphs are refreshed from ProductionTracker.
+		// Rebuilding the snapshot (sorting, copying history vectors, etc.) every
+		// frame is wasted work and makes the values jitter; once a second is
+		// plenty for production statistics.
+		constexpr std::chrono::milliseconds kRefreshInterval{1000};
+
+		ProductionData::Category s_cachedItems;
+		std::chrono::steady_clock::time_point s_lastRefreshTime{};
+		int s_cachedRangeIndex = -1;
+
+		// Returns a cached snapshot of the items for the selected range,
+		// refreshing it at most once per kRefreshInterval (or immediately if the
+		// selected range has changed).
+		const ProductionData::Category& GetCachedItems(ProductionData::TimeRange range, int rangeIndex)
+		{
+			auto now = std::chrono::steady_clock::now();
+			if (rangeIndex != s_cachedRangeIndex || now - s_lastRefreshTime >= kRefreshInterval)
+			{
+				s_cachedItems = ProductionTracker::GetItemsCategory(range);
+				s_cachedRangeIndex = rangeIndex;
+				s_lastRefreshTime = now;
+			}
+
+			return s_cachedItems;
+		}
+
+		// Splits the search box contents on commas into lowercase, trimmed
+		// search terms. An item matches if its name contains any one of them.
+		std::vector<std::string> ParseSearchTerms(const char* input)
+		{
+			std::vector<std::string> terms;
+			std::string current;
+
+			auto pushTerm = [&terms, &current]()
+			{
+				size_t begin = current.find_first_not_of(" \t");
+				size_t end = current.find_last_not_of(" \t");
+				if (begin != std::string::npos)
+					terms.push_back(current.substr(begin, end - begin + 1));
+				current.clear();
+			};
+
+			for (const char* p = input; *p; ++p)
+			{
+				if (*p == ',')
+					pushTerm();
+				else
+					current += static_cast<char>(std::tolower(static_cast<unsigned char>(*p)));
+			}
+			pushTerm();
+
+			return terms;
+		}
+
+		// True if no search terms are set, or the name contains at least one of them.
+		bool MatchesSearch(const std::string& name, const std::vector<std::string>& terms)
+		{
+			if (terms.empty())
+				return true;
+
+			std::string lowerName = name;
+			std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+				[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+			for (const std::string& term : terms)
+				if (!term.empty() && lowerName.find(term) != std::string::npos)
+					return true;
+
+			return false;
+		}
+
+		// Returns the subset of entries whose name matches the search terms.
+		std::vector<ProductionData::Entry> FilterEntries(const std::vector<ProductionData::Entry>& entries,
+			const std::vector<std::string>& terms)
+		{
+			if (terms.empty())
+				return entries;
+
+			std::vector<ProductionData::Entry> filtered;
+			for (const ProductionData::Entry& entry : entries)
+				if (MatchesSearch(entry.name, terms))
+					filtered.push_back(entry);
+
+			return filtered;
+		}
 
 		std::string FormatAmount(float value)
 		{
@@ -37,7 +131,7 @@ namespace ProductionUI
 			return buf;
 		}
 
-		// Renders the scrollable item list: name, relative bar, running total, rate/min.
+		// Renders the scrollable item list: name, history sparkline, running total, rate/min.
 		void RenderEntryTable(IModLoaderImGui* imgui, const char* tableId, const std::vector<ProductionData::Entry>& entries)
 		{
 			if (entries.empty())
@@ -46,29 +140,39 @@ namespace ProductionUI
 				return;
 			}
 
-			float maxTotal = 0.0f;
-			for (const auto& entry : entries)
-				maxTotal = (std::max)(maxTotal, entry.total);
-
 			if (!imgui->BeginTable(tableId, 4, 0))
 				return;
 
-			imgui->TableSetupColumn("Item", 0, 0.0f);
-			imgui->TableSetupColumn("", 0, 0.0f);
-			imgui->TableSetupColumn("Total", 0, 0.0f);
-			imgui->TableSetupColumn("Rate", 0, 0.0f);
+			constexpr int kColumnFlagsWidthStretch = 1 << 3; // ImGuiTableColumnFlags_WidthStretch
+			constexpr int kColumnFlagsWidthFixed = 1 << 4;   // ImGuiTableColumnFlags_WidthFixed
+
+			imgui->TableSetupColumn("Item", kColumnFlagsWidthStretch, 2.0f);
+			imgui->TableSetupColumn("History", kColumnFlagsWidthStretch, 2.0f);
+			imgui->TableSetupColumn("Total", kColumnFlagsWidthFixed, 60.0f);
+			imgui->TableSetupColumn("Rate", kColumnFlagsWidthFixed, 60.0f);
 			imgui->TableHeadersRow();
+
+			IPluginImGuiTextures* textures = GetHooks() ? GetHooks()->ImGuiTextures : nullptr;
+			constexpr float kIconSize = 20.0f;
+			constexpr float kGraphHeight = 20.0f;
 
 			for (const auto& entry : entries)
 			{
 				imgui->TableNextRow(0, 0.0f);
 
 				imgui->TableNextColumn();
+				if (entry.icon && textures)
+				{
+					textures->Image(entry.icon, kIconSize, kIconSize);
+					imgui->SameLine(0.0f, 4.0f);
+				}
 				imgui->Text(entry.name.c_str());
 
 				imgui->TableNextColumn();
-				float fraction = maxTotal > 0.0f ? entry.total / maxTotal : 0.0f;
-				imgui->ProgressBar(fraction, -1.0f, 0.0f, "");
+				float graphW, graphH;
+				imgui->GetContentRegionAvail(&graphW, &graphH);
+				std::string graphId = "##history_" + entry.name;
+				imgui->PlotLines(graphId.c_str(), entry.history.data(), static_cast<int>(entry.history.size()), 0, nullptr, 0.0f, FLT_MAX, graphW, kGraphHeight);
 
 				imgui->TableNextColumn();
 				imgui->Text(FormatAmount(entry.total).c_str());
@@ -84,7 +188,7 @@ namespace ProductionUI
 		// Renders one side of the window (Production or Consumption): header,
 		// aggregate history graph, and the item table.
 		void RenderSidePanel(IModLoaderImGui* imgui, const char* childId, const char* title,
-			const std::vector<ProductionData::Entry>& entries, bool* globalStats)
+			const std::vector<ProductionData::Entry>& entries)
 		{
 			float availX, availY;
 			imgui->GetContentRegionAvail(&availX, &availY);
@@ -92,7 +196,6 @@ namespace ProductionUI
 			if (imgui->BeginChild(childId, availX, availY, true))
 			{
 				imgui->SeparatorText(title);
-				imgui->Checkbox("Global statistics", globalStats);
 
 				if (!entries.empty())
 				{
@@ -103,7 +206,7 @@ namespace ProductionUI
 
 					float graphW, graphH;
 					imgui->GetContentRegionAvail(&graphW, &graphH);
-					imgui->PlotLines("", totals.data(), static_cast<int>(totals.size()), 0, nullptr, 0.0f, FLT_MAX, graphW, 120.0f);
+					imgui->PlotLines("##graph", totals.data(), static_cast<int>(totals.size()), 0, nullptr, 0.0f, FLT_MAX, graphW, 120.0f);
 				}
 				else
 				{
@@ -141,54 +244,64 @@ namespace ProductionUI
 
 			imgui->Separator();
 
-			// Category tabs (Items / Fluids / Buildings / Pollution / Kills)
-			const auto& categories = ProductionData::GetCategories();
-			if (imgui->BeginTabBar("ProductionViewer_Categories", 0))
+			const auto& items = GetCachedItems(ranges[s_selectedRangeIndex].value, s_selectedRangeIndex);
+			if (imgui->BeginTable("ProductionViewer_Columns", 2, 0))
 			{
-				for (const auto& category : categories)
-				{
-					if (imgui->BeginTabItem(category.name.c_str(), nullptr, 0))
-					{
-						if (imgui->BeginTable("ProductionViewer_Columns", 2, 0))
-						{
-							imgui->TableNextRow(0, 0.0f);
+				imgui->TableNextRow(0, 0.0f);
 
-							imgui->TableNextColumn();
-							RenderSidePanel(imgui, "ProductionViewer_ProductionPanel", "Production", category.production, &s_globalStatsProduction);
+				imgui->TableNextColumn();
+				RenderSidePanel(imgui, "ProductionViewer_ProductionPanel", "Production", items.production);
 
-							imgui->TableNextColumn();
-							RenderSidePanel(imgui, "ProductionViewer_ConsumptionPanel", "Consumption", category.consumption, &s_globalStatsConsumption);
+				imgui->TableNextColumn();
+				RenderSidePanel(imgui, "ProductionViewer_ConsumptionPanel", "Consumption", items.consumption);
 
-							imgui->EndTable();
-						}
-
-						imgui->EndTabItem();
-					}
-				}
-				imgui->EndTabBar();
+				imgui->EndTable();
 			}
 		}
 
 		void OnPanelClosed(PanelHandle handle)
 		{
+			LOG_DEBUG("ProductionUI: OnPanelClosed (handle=%p, ours=%s)", handle, handle == g_panel ? "yes" : "no");
+
 			if (handle == g_panel)
 				g_panelOpen = false;
 		}
 
-		void OnToggleKey(EModKey /*key*/, EModKeyEvent event)
+		void OnToggleKey(EModKey key, EModKeyEvent event)
 		{
+			LOG_DEBUG("ProductionUI: OnToggleKey (key=%u, event=%u)", static_cast<unsigned>(key), static_cast<unsigned>(event));
+
 			if (event != EModKeyEvent::Pressed)
 				return;
 
 			if (!g_self || !g_self->hooks->UI || !g_panel)
+			{
+				LOG_DEBUG("ProductionUI: OnToggleKey ignored (self=%s, UI=%s, panel=%s)",
+					g_self ? "yes" : "no",
+					(g_self && g_self->hooks->UI) ? "yes" : "no",
+					g_panel ? "yes" : "no");
 				return;
+			}
 
 			if (g_panelOpen)
+			{
+				// OnPanelClosed will update g_panelOpen.
 				g_self->hooks->UI->SetPanelClose(g_panel);
+			}
 			else
-				g_self->hooks->UI->SetPanelOpen(g_panel);
+			{
+				SDK::UWorld* world = SDK::UWorld::GetWorld();
+				if (!world || world->GetName() != "ChimeraMain")
+				{
+					LOG_DEBUG("ProductionUI: OnToggleKey ignored (not in ChimeraMain map)");
+					return;
+				}
 
-			g_panelOpen = !g_panelOpen;
+				g_self->hooks->UI->SetPanelOpen(g_panel);
+				g_panelOpen = true;
+			}
+
+			LOG_DEBUG("ProductionUI: panel toggled (now %s)", g_panelOpen ? "open" : "closed");
 		}
 	}
 
@@ -205,11 +318,19 @@ namespace ProductionUI
 		static PluginPanelDesc desc = { "Production Viewer", "Production Statistics", &RenderProductionWindow };
 		g_panel = self->hooks->UI->RegisterPanel(&desc);
 
+		LOG_DEBUG("ProductionUI: RegisterPanel returned handle=%p", g_panel);
+
 		self->hooks->UI->RegisterOnPanelWindowClosed(&OnPanelClosed);
 
 		if (self->hooks->Input)
 		{
-			self->hooks->Input->RegisterKeybindByName(ProductionViewerConfig::Config::GetToggleKey(), EModKeyEvent::Pressed, &OnToggleKey);
+			const char* toggleKey = ProductionViewerConfig::Config::GetToggleKey();
+			LOG_DEBUG("ProductionUI: registering toggle keybind '%s'", toggleKey);
+			self->hooks->Input->RegisterKeybindByName(toggleKey, EModKeyEvent::Pressed, &OnToggleKey);
+		}
+		else
+		{
+			LOG_DEBUG("ProductionUI: Input hooks unavailable - toggle keybind not registered");
 		}
 
 		LOG_INFO("Production Viewer window registered");
@@ -225,7 +346,9 @@ namespace ProductionUI
 
 		if (self->hooks->Input)
 		{
-			self->hooks->Input->UnregisterKeybindByName(ProductionViewerConfig::Config::GetToggleKey(), EModKeyEvent::Pressed, &OnToggleKey);
+			const char* toggleKey = ProductionViewerConfig::Config::GetToggleKey();
+			LOG_DEBUG("ProductionUI: unregistering toggle keybind '%s'", toggleKey);
+			self->hooks->Input->UnregisterKeybindByName(toggleKey, EModKeyEvent::Pressed, &OnToggleKey);
 		}
 
 		self->hooks->UI->UnregisterOnPanelWindowClosed(&OnPanelClosed);

@@ -16,7 +16,7 @@ namespace ProductionViewerConfig
 			"Menu",
 			"ToggleKey",
 			ConfigValueType::Keybind,
-			"F10",
+			"P",
 			"Key to open / close the ProductionViewer menu"
 		}
 	};
@@ -46,14 +46,14 @@ namespace ProductionViewerConfig
 			return s_self ? s_self->config->ReadBool(s_self, "General", "Enabled", true) : true;
 		}
 
-		// Returns the current toggle keybind string (e.g. "F10", "Ctrl+F10").
+		// Returns the current toggle keybind string (e.g. "P", "Ctrl+F10").
 		// The modloader re-registers the keybind automatically when the user changes it.
 		static const char* GetToggleKey()
 		{
 			static char buffer[64];
-			if (s_self && s_self->config->ReadString(s_self, "Menu", "ToggleKey", buffer, sizeof(buffer), "F10"))
+			if (s_self && s_self->config->ReadString(s_self, "Menu", "ToggleKey", buffer, sizeof(buffer), "P"))
 				return buffer;
-			return "F10";
+			return "P";
 		}
 
 	private:

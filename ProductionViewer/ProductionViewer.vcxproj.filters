@@ -16,6 +16,15 @@
     <Filter Include="Plugin Core\Helpers">
       <UniqueIdentifier>{a1b2c3d4-0001-0001-0001-000000000003}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Plugin Core\Signatures">
+      <UniqueIdentifier>{a1b2c3d4-0001-0001-0001-000000000007}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugin Core\Storage">
+      <UniqueIdentifier>{a1b2c3d4-0001-0001-0001-000000000005}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugin Core\Vendor">
+      <UniqueIdentifier>{a1b2c3d4-0001-0001-0001-000000000006}</UniqueIdentifier>
+    </Filter>
 
     <!-- Production Viewer UI and data model -->
     <Filter Include="Production Viewer">
@@ -49,8 +58,38 @@
       <Filter>Plugin Core\Helpers</Filter>
     </ClInclude>
 
+    <!-- Plugin Core\Signatures -->
+    <ClInclude Include="Plugin Core\Signatures\plugin_signatures.h">
+      <Filter>Plugin Core\Signatures</Filter>
+    </ClInclude>
+
+    <!-- Plugin Core\Storage -->
+    <ClInclude Include="Plugin Core\Storage\production_storage.h">
+      <Filter>Plugin Core\Storage</Filter>
+    </ClInclude>
+
+    <!-- Plugin Core\Vendor -->
+    <ClInclude Include="Plugin Core\Vendor\json.hpp">
+      <Filter>Plugin Core\Vendor</Filter>
+    </ClInclude>
+    <ClInclude Include="Plugin Core\Vendor\json_fwd.hpp">
+      <Filter>Plugin Core\Vendor</Filter>
+    </ClInclude>
+
     <!-- Production Viewer -->
     <ClInclude Include="Production Viewer\production_data.h">
+      <Filter>Production Viewer</Filter>
+    </ClInclude>
+    <ClInclude Include="Production Viewer\production_timeseries.h">
+      <Filter>Production Viewer</Filter>
+    </ClInclude>
+    <ClInclude Include="Production Viewer\production_tracker.h">
+      <Filter>Production Viewer</Filter>
+    </ClInclude>
+    <ClInclude Include="Production Viewer\production_icons.h">
+      <Filter>Production Viewer</Filter>
+    </ClInclude>
+    <ClInclude Include="Production Viewer\production_mass.h">
       <Filter>Production Viewer</Filter>
     </ClInclude>
     <ClInclude Include="Production Viewer\production_ui.h">
@@ -82,8 +121,22 @@
       <Filter>Plugin Core\Config</Filter>
     </ClCompile>
 
+    <!-- Plugin Core\Storage -->
+    <ClCompile Include="Plugin Core\Storage\production_storage.cpp">
+      <Filter>Plugin Core\Storage</Filter>
+    </ClCompile>
+
     <!-- Production Viewer -->
-    <ClCompile Include="Production Viewer\production_data.cpp">
+    <ClCompile Include="Production Viewer\production_timeseries.cpp">
+      <Filter>Production Viewer</Filter>
+    </ClCompile>
+    <ClCompile Include="Production Viewer\production_tracker.cpp">
+      <Filter>Production Viewer</Filter>
+    </ClCompile>
+    <ClCompile Include="Production Viewer\production_icons.cpp">
+      <Filter>Production Viewer</Filter>
+    </ClCompile>
+    <ClCompile Include="Production Viewer\production_mass.cpp">
       <Filter>Production Viewer</Filter>
     </ClCompile>
     <ClCompile Include="Production Viewer\production_ui.cpp">
@@ -98,6 +151,9 @@
       <Filter>SDK</Filter>
     </ClCompile>
     <ClCompile Include="$(StarRuptureSDKSourceDir)Engine_functions.cpp">
+      <Filter>SDK</Filter>
+    </ClCompile>
+    <ClCompile Include="$(StarRuptureSDKSourceDir)AuCrafting_functions.cpp">
       <Filter>SDK</Filter>
     </ClCompile>
 
