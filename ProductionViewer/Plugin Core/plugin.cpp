@@ -1,6 +1,7 @@
 #include "plugin.h"
-#include "plugin_helpers.h"
-#include "plugin_config.h"
+#include "Helpers/plugin_helpers.h"
+#include "Config/plugin_config.h"
+#include "Production Viewer/production_ui.h"
 
 // Global plugin self pointer — stable for the plugin's lifetime, retained from PluginInit
 static IPluginSelf* g_self = nullptr;
@@ -44,11 +45,8 @@ extern "C" {
 			return true; // Return true so plugin loads but doesn't activate
 		}
 
-		// Your initialization code would go here
-		// Examples:
-		// - Find memory patterns with scanner
-		// - Install hooks with hooks interface
-		// - Register callbacks
+		// Register the Production Viewer ImGui window
+		ProductionUI::Init(self);
 
 		LOG_INFO("Plugin initialized successfully");
 
@@ -59,11 +57,7 @@ extern "C" {
 	{
 		LOG_INFO("Plugin shutting down...");
 
-		// Your cleanup code would go here
-		// Examples:
-		// - Remove installed hooks
-		// - Free allocated resources
-		// - Unregister callbacks
+		ProductionUI::Shutdown(g_self);
 
 		g_self = nullptr;
 	}

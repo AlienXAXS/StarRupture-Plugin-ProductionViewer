@@ -97,11 +97,15 @@
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="plugin.cpp" />
     <ClCompile Include="plugin_config.cpp" />
+    <ClCompile Include="production_data.cpp" />
+    <ClCompile Include="production_ui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="plugin.h" />
     <ClInclude Include="plugin_config.h" />
     <ClInclude Include="plugin_helpers.h" />
+    <ClInclude Include="production_data.h" />
+    <ClInclude Include="production_ui.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ProductionViewer.def" />

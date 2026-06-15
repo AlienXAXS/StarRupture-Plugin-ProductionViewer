@@ -17,6 +17,11 @@
       <UniqueIdentifier>{a1b2c3d4-0001-0001-0001-000000000003}</UniqueIdentifier>
     </Filter>
 
+    <!-- Production Viewer UI and data model -->
+    <Filter Include="Production Viewer">
+      <UniqueIdentifier>{a1b2c3d4-0001-0001-0001-000000000004}</UniqueIdentifier>
+    </Filter>
+
     <!-- Modloader SDK header (read-only, from $(PluginSDKInclude)) -->
     <Filter Include="SDK">
       <UniqueIdentifier>{a1b2c3d4-0002-0002-0002-000000000001}</UniqueIdentifier>
@@ -44,6 +49,14 @@
       <Filter>Plugin Core\Helpers</Filter>
     </ClInclude>
 
+    <!-- Production Viewer -->
+    <ClInclude Include="production_data.h">
+      <Filter>Production Viewer</Filter>
+    </ClInclude>
+    <ClInclude Include="production_ui.h">
+      <Filter>Production Viewer</Filter>
+    </ClInclude>
+
     <!-- SDK (header resolved via $(PluginSDKInclude) in Shared.props) -->
     <ClInclude Include="$(PluginSDKInclude)\plugin_interface.h">
       <Filter>SDK</Filter>
@@ -67,6 +80,14 @@
     <!-- Plugin Core\Config -->
     <ClCompile Include="plugin_config.cpp">
       <Filter>Plugin Core\Config</Filter>
+    </ClCompile>
+
+    <!-- Production Viewer -->
+    <ClCompile Include="production_data.cpp">
+      <Filter>Production Viewer</Filter>
+    </ClCompile>
+    <ClCompile Include="production_ui.cpp">
+      <Filter>Production Viewer</Filter>
     </ClCompile>
 
     <!-- SDK source files (hidden, auto-included via props) -->
