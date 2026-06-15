@@ -10,9 +10,12 @@
 #include <array>
 #include <cctype>
 #include <cfloat>
+#include <cmath>
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace ProductionUI
@@ -42,6 +45,11 @@ namespace ProductionUI
 		ProductionData::Category s_cachedItems;
 		std::chrono::steady_clock::time_point s_lastRefreshTime{};
 		int s_cachedRangeIndex = -1;
+
+		// Name of the item row hovered in each side panel's table on the
+		// previous frame, used to highlight its line in the overview graph.
+		// Keyed by the panel's childId.
+		std::unordered_map<std::string, std::string> s_hoveredEntryByPanel;
 
 		// Returns a cached snapshot of the items for the selected range,
 		// refreshing it at most once per kRefreshInterval (or immediately if the
@@ -131,17 +139,58 @@ namespace ProductionUI
 			return buf;
 		}
 
+		// ImGuiCol_PlotLines' numeric value has moved between ImGui versions
+		// (e.g. tab-bar colors were inserted ahead of it), so resolve it by
+		// name at runtime instead of hardcoding an index. Returns -1 if not found.
+		int GetPlotLinesColorIndex(IModLoaderImGui* imgui)
+		{
+			static int s_index = -2;
+			if (s_index == -2)
+			{
+				s_index = -1;
+				for (int i = 0; i < 64; ++i)
+				{
+					const char* name = imgui->GetStyleColorName(i);
+					if (name && std::strcmp(name, "PlotLines") == 0)
+					{
+						s_index = i;
+						break;
+					}
+				}
+			}
+			return s_index;
+		}
+
+		// Label for the start (left edge) of the overview graph's x-axis,
+		// describing how far back the selected time range reaches.
+		const char* GetRangeStartLabel(ProductionData::TimeRange range)
+		{
+			switch (range)
+			{
+				case ProductionData::TimeRange::Seconds5:  return "-5s";
+				case ProductionData::TimeRange::Minutes1:  return "-1m";
+				case ProductionData::TimeRange::Minutes10: return "-10m";
+				case ProductionData::TimeRange::Hours1:    return "-1h";
+				case ProductionData::TimeRange::All:       return "oldest";
+				default: return "";
+			}
+		}
+
 		// Renders the scrollable item list: name, history sparkline, running total, rate/min.
-		void RenderEntryTable(IModLoaderImGui* imgui, const char* tableId, const std::vector<ProductionData::Entry>& entries)
+		// Returns the name of the entry whose row is currently hovered, or an empty
+		// string if none is.
+		std::string RenderEntryTable(IModLoaderImGui* imgui, const char* tableId, const std::vector<ProductionData::Entry>& entries)
 		{
 			if (entries.empty())
 			{
 				imgui->TextDisabled("No data yet.");
-				return;
+				return {};
 			}
 
 			if (!imgui->BeginTable(tableId, 4, 0))
-				return;
+				return {};
+
+			std::string hoveredName;
 
 			constexpr int kColumnFlagsWidthStretch = 1 << 3; // ImGuiTableColumnFlags_WidthStretch
 			constexpr int kColumnFlagsWidthFixed = 1 << 4;   // ImGuiTableColumnFlags_WidthFixed
@@ -156,11 +205,28 @@ namespace ProductionUI
 			constexpr float kIconSize = 20.0f;
 			constexpr float kGraphHeight = 20.0f;
 
+			// ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap
+			constexpr int kRowSelectableFlags = (1 << 1) | (1 << 4);
+			constexpr int kTableBgTargetRowBg0 = 1;
+
 			for (const auto& entry : entries)
 			{
 				imgui->TableNextRow(0, 0.0f);
 
 				imgui->TableNextColumn();
+
+				// Invisible, full-row selectable used purely for hover detection;
+				// AllowOverlap lets the icon/text/graph below still render normally.
+				std::string rowId = "##row_" + entry.name;
+				imgui->SelectableFull(rowId.c_str(), false, kRowSelectableFlags, 0.0f, 0.0f);
+				if (imgui->IsItemHovered())
+				{
+					hoveredName = entry.name;
+					unsigned int highlightColor = imgui->GetColorU32FromVec4(1.0f, 1.0f, 1.0f, 0.08f);
+					imgui->TableSetBgColor(kTableBgTargetRowBg0, highlightColor, -1);
+				}
+				imgui->SameLine(0.0f, 0.0f);
+
 				if (entry.icon && textures)
 				{
 					textures->Image(entry.icon, kIconSize, kIconSize);
@@ -183,12 +249,13 @@ namespace ProductionUI
 			}
 
 			imgui->EndTable();
+			return hoveredName;
 		}
 
 		// Renders one side of the window (Production or Consumption): header,
 		// aggregate history graph, and the item table.
 		void RenderSidePanel(IModLoaderImGui* imgui, const char* childId, const char* title,
-			const std::vector<ProductionData::Entry>& entries)
+			const std::vector<ProductionData::Entry>& entries, ProductionData::TimeRange range)
 		{
 			float availX, availY;
 			imgui->GetContentRegionAvail(&availX, &availY);
@@ -197,16 +264,130 @@ namespace ProductionUI
 			{
 				imgui->SeparatorText(title);
 
+				// Entry highlighted by hovering its row in the table below, as of last
+				// frame. Used to dim the other overview lines and brighten this one.
+				const std::string& hoveredEntry = s_hoveredEntryByPanel[childId];
+
 				if (!entries.empty())
 				{
-					std::array<float, ProductionData::kHistorySamples> totals{};
+					// Shared scale across all overlaid lines so they're visually comparable.
+					float maxValue = 0.0f;
 					for (const auto& entry : entries)
-						for (int i = 0; i < ProductionData::kHistorySamples; ++i)
-							totals[i] += entry.history[i];
+						for (float v : entry.history)
+							maxValue = (std::max)(maxValue, v);
+					if (maxValue <= 0.0f)
+						maxValue = 1.0f;
 
 					float graphW, graphH;
 					imgui->GetContentRegionAvail(&graphW, &graphH);
-					imgui->PlotLines("##graph", totals.data(), static_cast<int>(totals.size()), 0, nullptr, 0.0f, FLT_MAX, graphW, 120.0f);
+					constexpr float kOverviewGraphHeight = 150.0f;
+
+					constexpr int kColFrameBg = 7;
+					int colPlotLines = GetPlotLinesColorIndex(imgui);
+
+					// Overlaid plot rect, captured from the first line so the rest can be
+					// drawn at the same screen position (and so we can hit-test hover).
+					float rectMinX = 0.0f, rectMinY = 0.0f, rectMaxX = 0.0f, rectMaxY = 0.0f;
+
+					for (size_t i = 0; i < entries.size(); ++i)
+					{
+						const ProductionData::Entry& entry = entries[i];
+						bool first = (i == 0);
+
+						float hue = entries.size() > 1 ? static_cast<float>(i) / static_cast<float>(entries.size()) : 0.0f;
+
+						// Dim every line except the one hovered in the table, which is
+						// drawn brighter and fully opaque so it stands out.
+						float value = 0.95f;
+						float alpha = 1.0f;
+						if (!hoveredEntry.empty())
+						{
+							bool isHovered = entry.name == hoveredEntry;
+							value = isHovered ? 1.0f : 0.5f;
+							alpha = isHovered ? 1.0f : 0.25f;
+						}
+
+						float r, g, b;
+						imgui->ColorConvertHSVtoRGB(hue, 0.65f, value, &r, &g, &b);
+
+						int pushedColors = 0;
+						if (!first)
+						{
+							imgui->PushStyleColor(kColFrameBg, 0.0f, 0.0f, 0.0f, 0.0f);
+							imgui->SetCursorScreenPos(rectMinX, rectMinY);
+							++pushedColors;
+						}
+						if (colPlotLines >= 0)
+						{
+							imgui->PushStyleColor(colPlotLines, r, g, b, alpha);
+							++pushedColors;
+						}
+
+						std::string graphId = "##overview_" + entry.name;
+						imgui->PlotLines(graphId.c_str(), entry.history.data(), static_cast<int>(entry.history.size()),
+							0, nullptr, 0.0f, maxValue, graphW, kOverviewGraphHeight);
+
+						if (first)
+						{
+							imgui->GetItemRectMin(&rectMinX, &rectMinY);
+							imgui->GetItemRectMax(&rectMaxX, &rectMaxY);
+						}
+
+						if (pushedColors > 0)
+							imgui->PopStyleColor(pushedColors);
+					}
+
+					// Hover the overview graph to see which item a line belongs to.
+					if (imgui->IsMouseHoveringRect(rectMinX, rectMinY, rectMaxX, rectMaxY, true))
+					{
+						float mouseX, mouseY;
+						imgui->GetMousePos(&mouseX, &mouseY);
+
+						float width = rectMaxX - rectMinX;
+						float height = rectMaxY - rectMinY;
+						if (width > 0.0f && height > 0.0f)
+						{
+							float xFrac = std::clamp((mouseX - rectMinX) / width, 0.0f, 1.0f);
+							float yFrac = std::clamp((mouseY - rectMinY) / height, 0.0f, 1.0f);
+
+							int sampleIndex = static_cast<int>(xFrac * (ProductionData::kHistorySamples - 1) + 0.5f);
+							float valueAtMouse = maxValue * (1.0f - yFrac);
+
+							const ProductionData::Entry* closest = nullptr;
+							float closestDist = FLT_MAX;
+							for (const ProductionData::Entry& entry : entries)
+							{
+								float dist = std::fabs(entry.history[sampleIndex] - valueAtMouse);
+								if (dist < closestDist)
+								{
+									closestDist = dist;
+									closest = &entry;
+								}
+							}
+
+							if (closest)
+								imgui->SetTooltip(closest->name.c_str());
+						}
+					}
+
+					// Axis labels, overlaid on top of the graph corners.
+					constexpr float kAxisLabelPadding = 4.0f;
+					float textHeight = imgui->GetTextLineHeight();
+
+					// Y-axis max, top-left.
+					imgui->SetCursorScreenPos(rectMinX + kAxisLabelPadding, rectMinY + kAxisLabelPadding);
+					imgui->TextDisabled(FormatAmount(maxValue).c_str());
+
+					// X-axis range start, bottom-left.
+					imgui->SetCursorScreenPos(rectMinX + kAxisLabelPadding, rectMaxY - textHeight - kAxisLabelPadding);
+					imgui->TextDisabled(GetRangeStartLabel(range));
+
+					// X-axis "now", bottom-right.
+					const char* nowLabel = "now";
+					float nowW, nowH;
+					imgui->CalcTextSize(nowLabel, &nowW, &nowH, false, -1.0f);
+					imgui->SetCursorScreenPos(rectMaxX - nowW - kAxisLabelPadding, rectMaxY - textHeight - kAxisLabelPadding);
+					imgui->TextDisabled(nowLabel);
 				}
 				else
 				{
@@ -216,7 +397,7 @@ namespace ProductionUI
 				imgui->Separator();
 
 				std::string tableId = std::string(childId) + "_table";
-				RenderEntryTable(imgui, tableId.c_str(), entries);
+				s_hoveredEntryByPanel[childId] = RenderEntryTable(imgui, tableId.c_str(), entries);
 			}
 			imgui->EndChild();
 		}
@@ -245,18 +426,38 @@ namespace ProductionUI
 			imgui->Separator();
 
 			const auto& items = GetCachedItems(ranges[s_selectedRangeIndex].value, s_selectedRangeIndex);
-			if (imgui->BeginTable("ProductionViewer_Columns", 2, 0))
+			std::vector<std::string> searchTerms = ParseSearchTerms(s_searchBuffer);
+			std::vector<ProductionData::Entry> production = FilterEntries(items.production, searchTerms);
+			std::vector<ProductionData::Entry> consumption = FilterEntries(items.consumption, searchTerms);
+
+			float availX, availY;
+			imgui->GetContentRegionAvail(&availX, &availY);
+			float searchBarHeight = imgui->GetFrameHeightWithSpacing();
+			float contentHeight = availY - searchBarHeight;
+			if (contentHeight < 0.0f)
+				contentHeight = 0.0f;
+
+			if (imgui->BeginChild("ProductionViewer_Content", availX, contentHeight, false))
 			{
-				imgui->TableNextRow(0, 0.0f);
+				if (imgui->BeginTable("ProductionViewer_Columns", 2, 0))
+				{
+					imgui->TableNextRow(0, 0.0f);
 
-				imgui->TableNextColumn();
-				RenderSidePanel(imgui, "ProductionViewer_ProductionPanel", "Production", items.production);
+					imgui->TableNextColumn();
+					RenderSidePanel(imgui, "ProductionViewer_ProductionPanel", "Production", production, ranges[s_selectedRangeIndex].value);
 
-				imgui->TableNextColumn();
-				RenderSidePanel(imgui, "ProductionViewer_ConsumptionPanel", "Consumption", items.consumption);
+					imgui->TableNextColumn();
+					RenderSidePanel(imgui, "ProductionViewer_ConsumptionPanel", "Consumption", consumption, ranges[s_selectedRangeIndex].value);
 
-				imgui->EndTable();
+					imgui->EndTable();
+				}
 			}
+			imgui->EndChild();
+
+			imgui->Separator();
+			imgui->SetNextItemWidth(-1.0f);
+			imgui->InputTextWithHint("##ProductionViewer_Search", "Search items (comma-separated, e.g. wolf,tube,ore)",
+				s_searchBuffer, sizeof(s_searchBuffer));
 		}
 
 		void OnPanelClosed(PanelHandle handle)
