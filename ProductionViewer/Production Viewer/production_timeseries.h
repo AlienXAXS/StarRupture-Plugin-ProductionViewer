@@ -13,7 +13,6 @@ namespace ProductionData
 	// Time range selector shown along the top of the window.
 	enum class TimeRange
 	{
-		Seconds5,
 		Minutes1,
 		Minutes10,
 		Hours1,
@@ -29,7 +28,6 @@ namespace ProductionData
 	inline const std::vector<TimeRangeOption>& GetTimeRanges()
 	{
 		static const std::vector<TimeRangeOption> ranges = {
-			{ TimeRange::Seconds5,  "5s" },
 			{ TimeRange::Minutes1,  "1m" },
 			{ TimeRange::Minutes10, "10m" },
 			{ TimeRange::Hours1,    "1h" },
@@ -69,6 +67,9 @@ namespace ProductionData
 		// Oldest -> newest history samples for the given range's window.
 		std::array<float, kHistorySamples> GetHistory(TimeRange range) const;
 
+		// Oldest -> newest history samples converted to per-minute rates.
+		std::array<float, kHistorySamples> GetHistoryRatePerMinute(TimeRange range) const;
+
 		// Persists/restores only the All-Time tier and totals — the short-term
 		// tiers (5s/1m/10m/1h) intentionally reset each session.
 		nlohmann::json ToJson() const;
@@ -89,10 +90,9 @@ namespace ProductionData
 		static std::array<float, kHistorySamples> TierHistory(const Tier& tier);
 		static const Tier& FixedTierForRange(const TimeSeriesAggregator& self, TimeRange range);
 
-		// Fixed-width tiers covering 5s, 1m, 10m, 1h (index matches TimeRange
+		// Fixed-width tiers covering 1m, 10m, 1h (index matches TimeRange
 		// ordering for the windowed ranges).
-		Tier m_fixedTiers[4] = {
-			Tier{ 5.0f  / kHistorySamples },
+		Tier m_fixedTiers[3] = {
 			Tier{ 60.0f / kHistorySamples },
 			Tier{ 600.0f / kHistorySamples },
 			Tier{ 3600.0f / kHistorySamples },

@@ -30,7 +30,7 @@ namespace ProductionUI
 		IPluginSelf* g_self = nullptr;
 		bool g_panelOpen = false;
 
-		int s_selectedRangeIndex = 1; // default to "1m"
+		int s_selectedRangeIndex = 0; // default to "1m"
 
 		// Search bar text (comma-separated, matched against item names in both
 		// the Production and Consumption columns).
@@ -127,6 +127,31 @@ namespace ProductionUI
 			return filtered;
 		}
 
+		// Box moving-average over kSmoothing neighbours on each side.
+		// Softens per-bucket spikes (e.g. a craft every 2s on 1s buckets)
+		// without distorting longer trends.
+		constexpr int kSmoothing = 2; // 5-bucket window
+		std::array<float, ProductionData::kHistorySamples> SmoothHistory(
+			const std::array<float, ProductionData::kHistorySamples>& in)
+		{
+			std::array<float, ProductionData::kHistorySamples> out{};
+			for (int i = 0; i < ProductionData::kHistorySamples; ++i)
+			{
+				float sum = 0.0f;
+				int count = 0;
+				for (int j = i - kSmoothing; j <= i + kSmoothing; ++j)
+				{
+					if (j >= 0 && j < ProductionData::kHistorySamples)
+					{
+						sum += in[j];
+						++count;
+					}
+				}
+				out[i] = count > 0 ? sum / count : 0.0f;
+			}
+			return out;
+		}
+
 		std::string FormatAmount(float value)
 		{
 			char buf[32];
@@ -167,7 +192,6 @@ namespace ProductionUI
 		{
 			switch (range)
 			{
-				case ProductionData::TimeRange::Seconds5:  return "-5s";
 				case ProductionData::TimeRange::Minutes1:  return "-1m";
 				case ProductionData::TimeRange::Minutes10: return "-10m";
 				case ProductionData::TimeRange::Hours1:    return "-1h";
@@ -187,7 +211,7 @@ namespace ProductionUI
 				return {};
 			}
 
-			if (!imgui->BeginTable(tableId, 4, 0))
+			if (!imgui->BeginTable(tableId, 3, 0))
 				return {};
 
 			std::string hoveredName;
@@ -197,7 +221,6 @@ namespace ProductionUI
 
 			imgui->TableSetupColumn("Item", kColumnFlagsWidthStretch, 2.0f);
 			imgui->TableSetupColumn("History", kColumnFlagsWidthStretch, 2.0f);
-			imgui->TableSetupColumn("Total", kColumnFlagsWidthFixed, 60.0f);
 			imgui->TableSetupColumn("Rate", kColumnFlagsWidthFixed, 60.0f);
 			imgui->TableHeadersRow();
 
@@ -238,10 +261,8 @@ namespace ProductionUI
 				float graphW, graphH;
 				imgui->GetContentRegionAvail(&graphW, &graphH);
 				std::string graphId = "##history_" + entry.name;
-				imgui->PlotLines(graphId.c_str(), entry.history.data(), static_cast<int>(entry.history.size()), 0, nullptr, 0.0f, FLT_MAX, graphW, kGraphHeight);
-
-				imgui->TableNextColumn();
-				imgui->Text(FormatAmount(entry.total).c_str());
+				auto smoothed = SmoothHistory(entry.historyRatePerMinute);
+				imgui->PlotLines(graphId.c_str(), smoothed.data(), static_cast<int>(smoothed.size()), 0, nullptr, 0.0f, FLT_MAX, graphW, kGraphHeight);
 
 				imgui->TableNextColumn();
 				std::string rateText = FormatAmount(entry.ratePerMinute) + "/m";
@@ -270,10 +291,17 @@ namespace ProductionUI
 
 				if (!entries.empty())
 				{
+					// Pre-compute smoothed per-minute-rate history for every entry once;
+					// reused for max-scale, plotting, and hover hit-testing.
+					std::vector<std::array<float, ProductionData::kHistorySamples>> smoothed;
+					smoothed.reserve(entries.size());
+					for (const auto& entry : entries)
+						smoothed.push_back(SmoothHistory(entry.historyRatePerMinute));
+
 					// Shared scale across all overlaid lines so they're visually comparable.
 					float maxValue = 0.0f;
-					for (const auto& entry : entries)
-						for (float v : entry.history)
+					for (const auto& sh : smoothed)
+						for (float v : sh)
 							maxValue = (std::max)(maxValue, v);
 					if (maxValue <= 0.0f)
 						maxValue = 1.0f;
@@ -324,7 +352,7 @@ namespace ProductionUI
 						}
 
 						std::string graphId = "##overview_" + entry.name;
-						imgui->PlotLines(graphId.c_str(), entry.history.data(), static_cast<int>(entry.history.size()),
+						imgui->PlotLines(graphId.c_str(), smoothed[i].data(), static_cast<int>(smoothed[i].size()),
 							0, nullptr, 0.0f, maxValue, graphW, kOverviewGraphHeight);
 
 						if (first)
@@ -355,13 +383,13 @@ namespace ProductionUI
 
 							const ProductionData::Entry* closest = nullptr;
 							float closestDist = FLT_MAX;
-							for (const ProductionData::Entry& entry : entries)
+							for (size_t ei = 0; ei < entries.size(); ++ei)
 							{
-								float dist = std::fabs(entry.history[sampleIndex] - valueAtMouse);
+								float dist = std::fabs(smoothed[ei][sampleIndex] - valueAtMouse);
 								if (dist < closestDist)
 								{
 									closestDist = dist;
-									closest = &entry;
+									closest = &entries[ei];
 								}
 							}
 

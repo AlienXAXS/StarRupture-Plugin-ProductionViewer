@@ -69,10 +69,9 @@ namespace ProductionData
 	{
 		switch (range)
 		{
-			case TimeRange::Seconds5:  return self.m_fixedTiers[0];
-			case TimeRange::Minutes1:  return self.m_fixedTiers[1];
-			case TimeRange::Minutes10: return self.m_fixedTiers[2];
-			case TimeRange::Hours1:    return self.m_fixedTiers[3];
+			case TimeRange::Minutes1:  return self.m_fixedTiers[0];
+			case TimeRange::Minutes10: return self.m_fixedTiers[1];
+			case TimeRange::Hours1:    return self.m_fixedTiers[2];
 			default:                   return self.m_allTimeTier;
 		}
 	}
@@ -98,6 +97,16 @@ namespace ProductionData
 	std::array<float, kHistorySamples> TimeSeriesAggregator::GetHistory(TimeRange range) const
 	{
 		return TierHistory(FixedTierForRange(*this, range));
+	}
+
+	std::array<float, kHistorySamples> TimeSeriesAggregator::GetHistoryRatePerMinute(TimeRange range) const
+	{
+		const Tier& tier = FixedTierForRange(*this, range);
+		const float scale = tier.bucketWidth > 0.0f ? 60.0f / tier.bucketWidth : 0.0f;
+		auto raw = TierHistory(tier);
+		for (float& v : raw)
+			v *= scale;
+		return raw;
 	}
 
 	nlohmann::json TimeSeriesAggregator::ToJson() const
