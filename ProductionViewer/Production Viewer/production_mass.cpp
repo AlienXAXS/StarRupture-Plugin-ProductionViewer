@@ -28,7 +28,6 @@ namespace ProductionMass
 		SignalEntityFn       g_originalSignalEntity = nullptr;
 		HookHandle           g_signalEntityHook = nullptr;
 		CraftingCompleteCallback g_callback = nullptr;
-		SDK::FName           g_craftingItemCompleteSignal{};
 
 		// Reads the 32-bit displacement of a `call`/`jmp rel32` instruction
 		// (opcode E8/E9, 5 bytes total) at `instrAddr` and returns its target.
@@ -147,19 +146,8 @@ namespace ProductionMass
 			if (!g_callback || !self)
 				return;
 
-			// TEMPORARY DIAGNOSTIC: log any crafting-related signal name, even if it
-			// doesn't match CrMassSignals::CraftingItemComplete, so we can see what
-			// SignalEntity actually delivers for Mass-simulated (de-spawned) entities.
-			if (signalName != g_craftingItemCompleteSignal)
-			{
-				std::string name = signalName.ToString();
-				if (name.find("raft") != std::string::npos)
-				{
-					LOG_DEBUG("ProductionMass: SignalEntity - non-matching crafting-related signal '%s' for entity Index=%u SerialNumber=%u",
-						name.c_str(), entity.Index, entity.SerialNumber);
-				}
+			if (signalName.ToString() != "CraftingItemComplete")
 				return;
-			}
 
 			LOG_DEBUG("ProductionMass: SignalEntity - CraftingItemComplete for entity Index=%u SerialNumber=%u",
 				entity.Index, entity.SerialNumber);
@@ -209,7 +197,8 @@ namespace ProductionMass
 
 		// UCrMassActorComponent::GetMassFragment<FCrCraftingFragment> - see the
 		// comment on Signatures::GetMassFragment_FCrCraftingFragment. The AOB
-		// match address itself is the function entry point; from there, see
+		// matches a call site; the E8 rel32 at the match address is followed to
+		// reach the function entry. From there, see
 		// Signatures::GetMassFragment_StaticStructCallOffset/
 		// GetMassFragment_GetFragmentDataPtrCallOffset for the call/jmp offsets.
 		bool ResolveFragmentAccessors()
@@ -231,7 +220,21 @@ namespace ProductionMass
 				return false;
 			}
 
-			uintptr_t fragmentFn = addr + Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset;
+			uintptr_t fragmentFn;
+			if (Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset == ~0ULL)
+			{
+				// Xref AOB: the match is a call site; follow the E8 rel32 to the entry.
+				fragmentFn = FollowRelCall(addr);
+				if (!fragmentFn)
+				{
+					LOG_WARN("ProductionMass: ResolveFragmentAccessors - xref AOB call follow failed");
+					return false;
+				}
+			}
+			else
+			{
+				fragmentFn = addr + Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset;
+			}
 
 			LOG_DEBUG("ProductionMass: ResolveFragmentAccessors - AOB match=0x%llX fragmentFn=0x%llX",
 				static_cast<unsigned long long>(addr), static_cast<unsigned long long>(fragmentFn));
@@ -289,11 +292,6 @@ namespace ProductionMass
 
 		if (!ResolveFragmentAccessors())
 			return false;
-
-		// CrMassSignals::CraftingItemComplete - a global FName (.data), addressed
-		// relative to the running module's image base.
-		uintptr_t signalNameAddr = SDK::InSDKUtils::GetImageBase() + Signatures::RVA_CrMassSignals_CraftingItemComplete;
-		std::memcpy(&g_craftingItemCompleteSignal, reinterpret_cast<const void*>(signalNameAddr), sizeof(SDK::FName));
 
 		uintptr_t signalEntityAddr = ResolveSignalEntity();
 		if (!signalEntityAddr)
