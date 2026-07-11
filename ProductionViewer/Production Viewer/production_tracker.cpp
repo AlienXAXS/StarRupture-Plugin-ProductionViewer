@@ -2,6 +2,7 @@
 #include "production_timeseries.h"
 #include "production_icons.h"
 #include "production_mass.h"
+#include "production_basecore.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
 #include "Plugin Core/Signatures/plugin_signatures.h"
 #include "Plugin Core/Storage/production_storage.h"
@@ -26,11 +27,25 @@ namespace ProductionTracker
 		// How often the running totals are flushed to the session file.
 		constexpr float kSaveIntervalSeconds = 30.0f;
 
+		// This item's activity attributed to one base core (or the "Unknown
+		// Location" bucket for crafters outside any base core's area).
+		struct PerBaseRecord
+		{
+			std::string baseName;
+			TimeSeriesAggregator production;
+			TimeSeriesAggregator consumption;
+		};
+
 		struct ItemRecord
 		{
 			std::string displayName;
 			TimeSeriesAggregator production;
 			TimeSeriesAggregator consumption;
+			// Keyed by packed base core handle (ProductionBaseCore::PackHandle);
+			// key 0 = "Unknown Location". Session-scoped - unlike the global
+			// aggregators above, this is never persisted, so the per-base view
+			// resets each session (entity handles don't survive reloads anyway).
+			std::map<uint64_t, PerBaseRecord> perBase;
 		};
 
 		std::mutex g_mutex;
@@ -57,7 +72,8 @@ namespace ProductionTracker
 				outDisplayName = outKey;
 		}
 
-		void RecordSample(SDK::UAuItemDataBase* itemData, float amount, bool isProduction)
+		void RecordSample(SDK::UAuItemDataBase* itemData, float amount, bool isProduction,
+			const std::vector<ProductionBaseCore::BaseCoreInfo>& bases)
 		{
 			if (amount <= 0.0f)
 				return;
@@ -74,6 +90,22 @@ namespace ProductionTracker
 				record.production.AddSample(amount);
 			else
 				record.consumption.AddSample(amount);
+
+			auto addToBase = [&record, amount, isProduction](uint64_t baseKey, const std::string& baseName)
+			{
+				PerBaseRecord& perBase = record.perBase[baseKey];
+				perBase.baseName = baseName; // refreshed every sample so renames propagate
+				if (isProduction)
+					perBase.production.AddSample(amount);
+				else
+					perBase.consumption.AddSample(amount);
+			};
+
+			if (bases.empty())
+				addToBase(0, "Unknown Location");
+			else
+				for (const ProductionBaseCore::BaseCoreInfo& base : bases)
+					addToBase(ProductionBaseCore::PackHandle(base.handle), base.name);
 		}
 
 		// Builds the persisted JSON blob for all tracked items.
@@ -140,7 +172,8 @@ namespace ProductionTracker
 			return addr > 0x10000 && addr < 0x0000800000000000ULL;
 		}
 
-		void OnMassCraftingComplete(const SDK::FCrCraftingFragment* fragment)
+		void OnMassCraftingComplete(const SDK::FCrCraftingFragment* fragment, SDK::UWorld* world,
+			ProductionMass::FMassEntityHandle entity)
 		{
 			LOG_DEBUG("ProductionTracker: OnMassCraftingComplete - fragment=%p CurrentRecipe=%p SelectedRecipe=%p CraftingMultiplier=%d",
 				fragment, fragment->CurrentRecipe, fragment->SelectedRecipe, fragment->CraftingMultiplier);
@@ -161,6 +194,16 @@ namespace ProductionTracker
 
 			const int32_t multiplier = fragment->CraftingMultiplier > 0 ? fragment->CraftingMultiplier : 1;
 
+			// Which base core(s) this crafter resides in - cached per crafter,
+			// so this is a map lookup on all but the first (and TTL-refresh)
+			// completions. Empty = "Unknown Location".
+			const std::vector<ProductionBaseCore::BaseCoreInfo> bases =
+				ProductionBaseCore::GetBaseCoresForBuilding(world, entity);
+
+			LOG_DEBUG("ProductionTracker: OnMassCraftingComplete - crafter Index=%u Serial=%u resides in %zu base(s)%s%s",
+				entity.Index, entity.SerialNumber, bases.size(),
+				bases.empty() ? "" : ", first: ", bases.empty() ? "" : bases[0].name.c_str());
+
 			LOG_DEBUG("ProductionTracker: OnMassCraftingComplete - calling GetOutputItem on recipe=%p", recipe);
 			SDK::FAuSimpleItem outputItem = recipe->GetOutputItem();
 			std::string outputKey, outputDisplayName;
@@ -168,15 +211,16 @@ namespace ProductionTracker
 			LOG_DEBUG("ProductionTracker: OnMassCraftingComplete - output '%s' (%s) x%d (multiplier %d)",
 				outputDisplayName.c_str(), outputKey.c_str(), outputItem.Count, multiplier);
 
-			RecordSample(outputItem.ItemDataBase, static_cast<float>(outputItem.Count * multiplier), true);
+			RecordSample(outputItem.ItemDataBase, static_cast<float>(outputItem.Count * multiplier), true, bases);
 
 			for (const SDK::FAuSimpleItem& resource : recipe->GetNeededResources())
-				RecordSample(resource.ItemDataBase, static_cast<float>(resource.Count * multiplier), false);
+				RecordSample(resource.ItemDataBase, static_cast<float>(resource.Count * multiplier), false, bases);
 		}
 
 		void OnEngineTick(float deltaSeconds)
 		{
 			ProductionIcons::Tick();
+			ProductionBaseCore::Tick(deltaSeconds);
 
 			{
 				std::lock_guard<std::mutex> lock(g_mutex);
@@ -184,6 +228,12 @@ namespace ProductionTracker
 				{
 					record.production.Tick(deltaSeconds);
 					record.consumption.Tick(deltaSeconds);
+
+					for (auto& [baseKey, perBase] : record.perBase)
+					{
+						perBase.production.Tick(deltaSeconds);
+						perBase.consumption.Tick(deltaSeconds);
+					}
 				}
 			}
 
@@ -201,6 +251,11 @@ namespace ProductionTracker
 		if (self->hooks->Engine)
 			self->hooks->Engine->RegisterOnTick(&OnEngineTick);
 
+		// Resolves the base core containment query + custom-name functions used
+		// to attribute craft completions to a base. Degrades to "Unknown
+		// Location" if its patterns don't match.
+		ProductionBaseCore::Init(self);
+
 		// Catches crafting completions for Mass-simulated (de-spawned) factories,
 		// which the actor-only hook above can't see.
 		ProductionMass::Init(self, &OnMassCraftingComplete);
@@ -214,6 +269,7 @@ namespace ProductionTracker
 			self->hooks->Engine->UnregisterOnTick(&OnEngineTick);
 
 		ProductionMass::Shutdown(self);
+		ProductionBaseCore::Shutdown();
 
 		SaveToSession();
 
@@ -229,6 +285,9 @@ namespace ProductionTracker
 			g_saveTimer = 0.0f;
 		}
 
+		// Entity handles and cached locations don't survive a session change.
+		ProductionBaseCore::OnSessionLoaded();
+
 		LoadFromSession();
 	}
 
@@ -238,6 +297,42 @@ namespace ProductionTracker
 
 		items = Category{};
 		items.name = "Items";
+
+		// Per-base breakdown for one direction (production or consumption) of
+		// an item, nearest base first, unknown distances last.
+		auto buildBreakdown = [range](const std::map<uint64_t, PerBaseRecord>& perBase, bool isProduction)
+		{
+			std::vector<BaseCoreBreakdown> breakdown;
+			for (const auto& [baseKey, record] : perBase)
+			{
+				const TimeSeriesAggregator& agg = isProduction ? record.production : record.consumption;
+				const float total = agg.GetTotal(range);
+				if (total <= 0.0f)
+					continue;
+
+				BaseCoreBreakdown base;
+				base.baseName = record.baseName;
+				base.total = total;
+				base.ratePerMinute = agg.GetRatePerMinute(TimeRange::Minutes1);
+				base.distanceMeters = baseKey != 0 ? ProductionBaseCore::GetDistanceMeters(baseKey) : -1.0f;
+				base.baseKey = baseKey;
+				breakdown.push_back(std::move(base));
+			}
+
+			std::sort(breakdown.begin(), breakdown.end(),
+				[](const BaseCoreBreakdown& a, const BaseCoreBreakdown& b)
+				{
+					const bool aKnown = a.distanceMeters >= 0.0f;
+					const bool bKnown = b.distanceMeters >= 0.0f;
+					if (aKnown != bKnown)
+						return aKnown;
+					if (aKnown && a.distanceMeters != b.distanceMeters)
+						return a.distanceMeters < b.distanceMeters;
+					return a.baseName < b.baseName;
+				});
+
+			return breakdown;
+		};
 
 		{
 			std::lock_guard<std::mutex> lock(g_mutex);
@@ -257,6 +352,7 @@ namespace ProductionTracker
 					entry.history = record.production.GetHistory(range);
 					entry.historyRatePerMinute = record.production.GetHistoryRatePerMinute(range);
 					entry.icon = icon;
+					entry.baseBreakdown = buildBreakdown(record.perBase, true);
 					items.production.push_back(std::move(entry));
 				}
 
@@ -269,6 +365,7 @@ namespace ProductionTracker
 					entry.history = record.consumption.GetHistory(range);
 					entry.historyRatePerMinute = record.consumption.GetHistoryRatePerMinute(range);
 					entry.icon = icon;
+					entry.baseBreakdown = buildBreakdown(record.perBase, false);
 					items.consumption.push_back(std::move(entry));
 				}
 			}

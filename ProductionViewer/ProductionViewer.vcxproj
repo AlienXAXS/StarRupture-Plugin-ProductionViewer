@@ -105,6 +105,8 @@
     <ClCompile Include="Production Viewer\production_tracker.cpp" />
     <ClCompile Include="Production Viewer\production_icons.cpp" />
     <ClCompile Include="Production Viewer\production_mass.cpp" />
+    <ClCompile Include="Production Viewer\production_basecore.cpp" />
+    <ClCompile Include="Production Viewer\production_waypoint.cpp" />
     <ClCompile Include="Production Viewer\production_ui.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -120,6 +122,8 @@
     <ClInclude Include="Production Viewer\production_tracker.h" />
     <ClInclude Include="Production Viewer\production_icons.h" />
     <ClInclude Include="Production Viewer\production_mass.h" />
+    <ClInclude Include="Production Viewer\production_basecore.h" />
+    <ClInclude Include="Production Viewer\production_waypoint.h" />
     <ClInclude Include="Production Viewer\production_ui.h" />
   </ItemGroup>
   <ItemGroup>

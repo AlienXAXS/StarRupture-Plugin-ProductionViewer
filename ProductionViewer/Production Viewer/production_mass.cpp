@@ -192,7 +192,7 @@ namespace ProductionMass
 			}
 
 			if (fragment)
-				g_callback(fragment);
+				g_callback(fragment, world, entity);
 		}
 
 		// UCrMassActorComponent::GetMassFragment<FCrCraftingFragment> - see the
@@ -276,6 +276,57 @@ namespace ProductionMass
 
 			return addr;
 		}
+	}
+
+	bool GetEntityLocation(SDK::UWorld* world, FMassEntityHandle entity, SDK::FVector& outLocation)
+	{
+		if (!world || !g_getFragmentDataPtr || !g_getMassEntitySubsystem)
+		{
+			LOG_TRACE("ProductionMass: GetEntityLocation - unavailable (world=%p getFragment=%p getSubsystem=%p)",
+				static_cast<void*>(world), reinterpret_cast<void*>(g_getFragmentDataPtr),
+				reinterpret_cast<void*>(g_getMassEntitySubsystem));
+			return false;
+		}
+
+		void* entityManager = ResolveEntityManager(world);
+		if (!entityManager)
+		{
+			LOG_DEBUG("ProductionMass: GetEntityLocation - failed to resolve FMassEntityManager for world=%p",
+				static_cast<void*>(world));
+			return false;
+		}
+
+		// FTransformFragment is a stock engine Mass fragment, so its
+		// UScriptStruct is reachable through reflection - unlike
+		// FCrCraftingFragment, whose StaticStruct had to be AOB-resolved.
+		// Resolved once and cached; the Mass module is guaranteed loaded by
+		// the time any entity lookup makes sense.
+		static SDK::UScriptStruct* s_transformFragmentStruct = nullptr;
+		if (!s_transformFragmentStruct)
+		{
+			s_transformFragmentStruct = SDK::UObject::FindObjectFast<SDK::UScriptStruct>("TransformFragment");
+			if (!s_transformFragmentStruct)
+			{
+				LOG_WARN("ProductionMass: GetEntityLocation - ScriptStruct 'TransformFragment' not found");
+				return false;
+			}
+			LOG_DEBUG("ProductionMass: GetEntityLocation - resolved TransformFragment struct %p (%s)",
+				static_cast<void*>(s_transformFragmentStruct), s_transformFragmentStruct->GetFullName().c_str());
+		}
+
+		const auto* fragment = static_cast<const uint8_t*>(
+			g_getFragmentDataPtr(entityManager, entity, s_transformFragmentStruct));
+		if (!fragment)
+		{
+			LOG_DEBUG("ProductionMass: GetEntityLocation - entity Index=%u Serial=%u has no FTransformFragment",
+				entity.Index, entity.SerialNumber);
+			return false;
+		}
+
+		// FTransformFragment { FTransform Transform; } - Translation (FVector,
+		// 3 doubles) sits at +0x20 within FTransform (after the 0x20 FQuat).
+		std::memcpy(&outLocation, fragment + 0x20, sizeof(SDK::FVector));
+		return true;
 	}
 
 	bool Init(IPluginSelf* self, CraftingCompleteCallback callback)

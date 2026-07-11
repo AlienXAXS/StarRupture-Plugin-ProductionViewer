@@ -58,4 +58,31 @@ namespace Signatures
 		"48 63 40 ?? 3B 43 ?? 7F ?? 48 8B C8 48 8B 43 ?? ?? ?? ?? ?? 74 ?? 33 DB 48 8B D3 48 8B CF 48 8B 5C 24 ?? "
 		"48 83 C4 ?? 5F E9 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 4C 89 4C 24 ?? 4C 89 44 24";
 
+	// ---- ProductionBaseCore (production_basecore.cpp) ----
+
+	// UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding(UCrBaseCoreSubsystem* this,
+	//     FMassEntityHandle Building, TArray<FCrGridEntityHandle,TSizedDefaultAllocator<32>>* OutBaseCores,
+	//     bool FunctionalBaseCoresOnly)
+	// The game's own "which base core's area contains this building" spatial
+	// query - reads the building entity's FTransformFragment internally, so a
+	// bare FMassEntityHandle is all it needs. Matches the function entry itself
+	// (not a call-site xref), so the resolved address is cast directly.
+	inline constexpr const char* GetBaseCoresRangedBuilding =
+		"48 89 5C 24 ?? 48 89 6C 24 ?? 56 57 41 56 48 83 EC ?? 65 48 8B 04 25 ?? ?? ?? ?? 48 8B FA";
+
+	// FCrMassEntityReplicationHelper::FCrMassEntityReplicationHelper(FMassEntityHandle, UObject const*)
+	// Builds the NetID + persistent-ID helper the custom-name subsystem keys on.
+	// Ported from BetterMap's basecore_rename.h (same modloader/game pairing).
+	inline constexpr const char* BaseCoreReplicationHelperCtor =
+		"48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 33 ED C7 41 ?? ?? ?? ?? ?? ?? ?? 48 8B F1";
+
+	// UCrBuildingCustomNameSubsystem::GetBuildingCustomNameByReplicationHelper(
+	//     FString* result, FCrMassEntityReplicationHelper*, bool* outIsDefaultName)
+	// Resolves a building's player-assigned custom name (replicated, works for
+	// de-spawned/unloaded buildings). outIsDefaultName is set when the subsystem
+	// fell back to the building's default type name (e.g. "Base Core").
+	// Ported from BetterMap's basecore_rename.h.
+	inline constexpr const char* GetBuildingCustomNameByReplicationHelper =
+		"48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 49 8B E9 49 8B D8 48 8B FA 48 8B F1 E8 ?? ?? ?? ?? 48 8B C8 E8";
+
 }

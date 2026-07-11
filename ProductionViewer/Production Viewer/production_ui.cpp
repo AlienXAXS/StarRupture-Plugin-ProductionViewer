@@ -1,6 +1,7 @@
 #include "production_ui.h"
 #include "production_data.h"
 #include "production_tracker.h"
+#include "production_waypoint.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
 #include "Plugin Core/Config/plugin_config.h"
 
@@ -32,6 +33,10 @@ namespace ProductionUI
 
 		int s_selectedRangeIndex = 0; // default to "1m"
 
+		// When set, rows expanded to show their base-core breakdown are
+		// pinned to the top of their table, regardless of rate/total.
+		bool s_keepExpandedAtTop = false;
+
 		// Search bar text (comma-separated, matched against item names in both
 		// the Production and Consumption columns).
 		char s_searchBuffer[128] = "";
@@ -50,6 +55,10 @@ namespace ProductionUI
 		// previous frame, used to highlight its line in the overview graph.
 		// Keyed by the panel's childId.
 		std::unordered_map<std::string, std::string> s_hoveredEntryByPanel;
+
+		// Item rows expanded (by clicking) to show their per-base-core
+		// breakdown. Keyed by "<tableId>/<item name>".
+		std::unordered_map<std::string, bool> s_expandedRows;
 
 		// Returns a cached snapshot of the items for the selected range,
 		// refreshing it at most once per kRefreshInterval (or immediately if the
@@ -125,6 +134,19 @@ namespace ProductionUI
 					filtered.push_back(entry);
 
 			return filtered;
+		}
+
+		// Moves rows expanded in the given table (per s_expandedRows) to the
+		// front, preserving the existing relative order otherwise (rate/total
+		// descending, as GetItemsCategory already sorted them).
+		void SortExpandedToTop(std::vector<ProductionData::Entry>& entries, const std::string& tableId)
+		{
+			std::stable_partition(entries.begin(), entries.end(),
+				[&tableId](const ProductionData::Entry& entry)
+				{
+					auto it = s_expandedRows.find(tableId + "/" + entry.name);
+					return it != s_expandedRows.end() && it->second;
+				});
 		}
 
 		// Box moving-average over kSmoothing neighbours on each side.
@@ -232,16 +254,31 @@ namespace ProductionUI
 			constexpr int kRowSelectableFlags = (1 << 1) | (1 << 4);
 			constexpr int kTableBgTargetRowBg0 = 1;
 
+			constexpr float kBreakdownIndent = 24.0f;
+
 			for (const auto& entry : entries)
 			{
 				imgui->TableNextRow(0, 0.0f);
 
 				imgui->TableNextColumn();
 
-				// Invisible, full-row selectable used purely for hover detection;
-				// AllowOverlap lets the icon/text/graph below still render normally.
+				// Invisible, full-row selectable used for hover detection and
+				// click-to-expand; AllowOverlap lets the icon/text/graph below
+				// still render normally.
+				const std::string expandKey = std::string(tableId) + "/" + entry.name;
 				std::string rowId = "##row_" + entry.name;
-				imgui->SelectableFull(rowId.c_str(), false, kRowSelectableFlags, 0.0f, 0.0f);
+				if (imgui->SelectableFull(rowId.c_str(), false, kRowSelectableFlags, 0.0f, 0.0f))
+				{
+					bool nowExpanded = !s_expandedRows[expandKey];
+					s_expandedRows[expandKey] = nowExpanded;
+
+					// With "keep expanded at top" on, expanding this row is
+					// about to jump it to the front of the list (next frame's
+					// SortExpandedToTop) - scroll up now so the user doesn't
+					// lose track of it under their old scroll position.
+					if (nowExpanded && s_keepExpandedAtTop)
+						imgui->SetScrollY(0.0f);
+				}
 				if (imgui->IsItemHovered())
 				{
 					hoveredName = entry.name;
@@ -267,6 +304,58 @@ namespace ProductionUI
 				imgui->TableNextColumn();
 				std::string rateText = FormatAmount(entry.ratePerMinute) + "/m";
 				imgui->Text(rateText.c_str());
+
+				// Per-base-core breakdown, toggled by clicking the row above.
+				// Nearest base first (pre-sorted by the tracker).
+				if (s_expandedRows[expandKey])
+				{
+					if (entry.baseBreakdown.empty())
+					{
+						// Restored all-time totals with no activity yet this
+						// session - locations are only known for crafts seen live.
+						imgui->TableNextRow(0, 0.0f);
+						imgui->TableNextColumn();
+						imgui->Indent(kBreakdownIndent);
+						imgui->TextDisabled("No location data yet.");
+						imgui->Unindent(kBreakdownIndent);
+						imgui->TableNextColumn();
+						imgui->TableNextColumn();
+					}
+
+					for (const auto& base : entry.baseBreakdown)
+					{
+						imgui->TableNextRow(0, 0.0f);
+
+						imgui->TableNextColumn();
+						imgui->Indent(kBreakdownIndent);
+						imgui->TextDisabled(base.baseName.c_str());
+						imgui->Unindent(kBreakdownIndent);
+
+						imgui->TableNextColumn();
+						std::string detailText = FormatAmount(base.total) + " total";
+						if (base.distanceMeters >= 0.0f)
+						{
+							char distance[32];
+							snprintf(distance, sizeof(distance), " - %.0fm away", base.distanceMeters);
+							detailText += distance;
+						}
+						imgui->TextDisabled(detailText.c_str());
+
+						// Only known, locatable base cores can be navigated to -
+						// "Unknown Location" (baseKey 0) has nothing to point at.
+						if (base.baseKey != 0 && base.distanceMeters >= 0.0f)
+						{
+							imgui->SameLine(0.0f, 8.0f);
+							std::string goId = "Go##waypoint_" + std::to_string(base.baseKey);
+							if (imgui->SmallButton(goId.c_str()))
+								ProductionWaypoint::SetTarget(base.baseKey, base.baseName);
+						}
+
+						imgui->TableNextColumn();
+						std::string baseRateText = FormatAmount(base.ratePerMinute) + "/m";
+						imgui->TextDisabled(baseRateText.c_str());
+					}
+				}
 			}
 
 			imgui->EndTable();
@@ -451,12 +540,21 @@ namespace ProductionUI
 					imgui->SameLine(0.0f, 4.0f);
 			}
 
+			imgui->SameLine(0.0f, 16.0f);
+			imgui->Checkbox("Always keep expanded items at the top", &s_keepExpandedAtTop);
+
 			imgui->Separator();
 
 			const auto& items = GetCachedItems(ranges[s_selectedRangeIndex].value, s_selectedRangeIndex);
 			std::vector<std::string> searchTerms = ParseSearchTerms(s_searchBuffer);
 			std::vector<ProductionData::Entry> production = FilterEntries(items.production, searchTerms);
 			std::vector<ProductionData::Entry> consumption = FilterEntries(items.consumption, searchTerms);
+
+			if (s_keepExpandedAtTop)
+			{
+				SortExpandedToTop(production, "ProductionViewer_ProductionPanel_table");
+				SortExpandedToTop(consumption, "ProductionViewer_ConsumptionPanel_table");
+			}
 
 			float availX, availY;
 			imgui->GetContentRegionAvail(&availX, &availY);
