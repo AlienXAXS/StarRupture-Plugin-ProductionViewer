@@ -64,6 +64,11 @@ namespace ProductionData
 		// GetTotal(range) normalized to a per-minute rate.
 		float GetRatePerMinute(TimeRange range) const;
 
+		// Seconds this item has been tracked for, accumulated across sessions.
+		// Replicated alongside the All-Time total so a client's All-Time rate
+		// matches the server's rather than being measured from when it joined.
+		float GetAllTimeElapsed() const { return m_allTimeElapsed; }
+
 		// Oldest -> newest history samples for the given range's window.
 		std::array<float, kHistorySamples> GetHistory(TimeRange range) const;
 
@@ -74,6 +79,14 @@ namespace ProductionData
 		// tiers (5s/1m/10m/1h) intentionally reset each session.
 		nlohmann::json ToJson() const;
 		void FromJson(const nlohmann::json& json);
+
+		// Overwrites the All-Time total and elapsed time with an authoritative
+		// figure from elsewhere — the server's copy of this item, replicated to
+		// a multiplayer client. The All-Time *history buckets* are deliberately
+		// not touched: they are far too large to replicate, so the client's
+		// All-Time graph covers only the time since it synced even though the
+		// total beside it is the server's real lifetime figure.
+		void SeedAllTime(float total, float elapsedSeconds);
 
 	private:
 		struct Tier

@@ -109,6 +109,12 @@ namespace ProductionData
 		return raw;
 	}
 
+	void TimeSeriesAggregator::SeedAllTime(float total, float elapsedSeconds)
+	{
+		m_allTimeTotal = total;
+		m_allTimeElapsed = elapsedSeconds;
+	}
+
 	nlohmann::json TimeSeriesAggregator::ToJson() const
 	{
 		nlohmann::json j;

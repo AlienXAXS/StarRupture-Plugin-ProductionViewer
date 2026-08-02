@@ -18,6 +18,20 @@ namespace ProductionViewerConfig
 			ConfigValueType::Keybind,
 			"P",
 			"Key to open / close the ProductionViewer menu"
+		},
+		{
+			"Network",
+			"BroadcastInterval",
+			ConfigValueType::Float,
+			"1.0",
+			"Seconds between production updates sent from the server to clients"
+		},
+		{
+			"Network",
+			"StaleAfterSeconds",
+			ConfigValueType::Float,
+			"10.0",
+			"Seconds without a server update before a client flags its production data as stale"
 		}
 	};
 
@@ -54,6 +68,23 @@ namespace ProductionViewerConfig
 			if (s_self && s_self->config->ReadString(s_self, "Menu", "ToggleKey", buffer, sizeof(buffer), "P"))
 				return buffer;
 			return "P";
+		}
+
+		// How often the server pushes production updates to clients. Clamped:
+		// faster than a few times a second buys nothing (the panel itself only
+		// refreshes once a second) and just burns bandwidth.
+		static float GetBroadcastInterval()
+		{
+			const float value = s_self ? s_self->config->ReadFloat(s_self, "Network", "BroadcastInterval", 1.0f) : 1.0f;
+			return value < 0.25f ? 0.25f : (value > 30.0f ? 30.0f : value);
+		}
+
+		// How long a client tolerates silence before saying so. Must stay above
+		// the server's heartbeat cadence or an idle base reads as a dead link.
+		static float GetStaleAfterSeconds()
+		{
+			const float value = s_self ? s_self->config->ReadFloat(s_self, "Network", "StaleAfterSeconds", 10.0f) : 10.0f;
+			return value < 6.0f ? 6.0f : (value > 300.0f ? 300.0f : value);
 		}
 
 	private:

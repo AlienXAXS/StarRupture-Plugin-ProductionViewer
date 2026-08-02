@@ -9,12 +9,18 @@ Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Client Debug|x64 = Client Debug|x64
 		Client Release|x64 = Client Release|x64
+		Server Debug|x64 = Server Debug|x64
+		Server Release|x64 = Server Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{94D526E5-C79F-440E-BB3A-32CF54860D22}.Client Debug|x64.ActiveCfg = Client Debug|x64
 		{94D526E5-C79F-440E-BB3A-32CF54860D22}.Client Debug|x64.Build.0 = Client Debug|x64
 		{94D526E5-C79F-440E-BB3A-32CF54860D22}.Client Release|x64.ActiveCfg = Client Release|x64
 		{94D526E5-C79F-440E-BB3A-32CF54860D22}.Client Release|x64.Build.0 = Client Release|x64
+		{94D526E5-C79F-440E-BB3A-32CF54860D22}.Server Debug|x64.ActiveCfg = Server Debug|x64
+		{94D526E5-C79F-440E-BB3A-32CF54860D22}.Server Debug|x64.Build.0 = Server Debug|x64
+		{94D526E5-C79F-440E-BB3A-32CF54860D22}.Server Release|x64.ActiveCfg = Server Release|x64
+		{94D526E5-C79F-440E-BB3A-32CF54860D22}.Server Release|x64.Build.0 = Server Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

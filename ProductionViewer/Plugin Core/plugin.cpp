@@ -1,6 +1,7 @@
 #include "plugin.h"
 #include "Helpers/plugin_helpers.h"
 #include "Config/plugin_config.h"
+#include "Net/production_net.h"
 #include "Storage/production_storage.h"
 #include "Production Viewer/production_ui.h"
 #include "Production Viewer/production_tracker.h"
@@ -18,13 +19,26 @@ IPluginSelf* GetSelf() { return g_self; }
 #define MODLOADER_BUILD_TAG "dev"
 #endif
 
+// The loader refuses a DLL whose target doesn't match its own build. The server
+// build carries no UI at all — it exists to track the whole base and feed the
+// clients, which are the only ones that draw anything.
+#if defined(MODLOADER_SERVER_BUILD)
+#define PLUGIN_TARGET_THIS PLUGIN_TARGET_SERVER
+static const char* kBuildFlavour = "server";
+#else
+#define PLUGIN_TARGET_THIS PLUGIN_TARGET_CLIENT
+static const char* kBuildFlavour = "client";
+#endif
+
+// The name doubles as the network routing key — the client and server builds
+// must agree on it exactly or every packet is silently dropped.
 static PluginInfo s_pluginInfo = {
 	"ProductionViewer",
 	MODLOADER_BUILD_TAG,
 	"AlienX",
 	"Displays production information",
 	PLUGIN_INTERFACE_VERSION,
-	PLUGIN_TARGET_CLIENT
+	PLUGIN_TARGET_THIS
 };
 
 // Fires once a save is fully loaded into the world — (re)load this session's
@@ -38,8 +52,20 @@ static void OnExperienceLoadComplete()
 		return;
 	}
 
-	if (ProductionViewer::Storage::Reload())
-		ProductionTracker::OnSessionLoaded();
+	// Called unconditionally, even when there is no session file to reload: a
+	// client has none (its data comes off the wire) but still has to drop the
+	// previous world's numbers, and the server has to tell its clients to.
+	if (!ProductionViewer::Storage::Reload())
+		LOG_DEBUG("OnExperienceLoadComplete: no session storage resolved - starting from empty");
+
+	ProductionTracker::OnSessionLoaded();
+}
+
+// Server-side: a joining player would otherwise stare at an empty panel until
+// something happened to get crafted.
+static void OnPlayerJoined(void* playerController)
+{
+	ProductionNet::SendSnapshotTo(playerController);
 }
 
 extern "C" {
@@ -54,7 +80,7 @@ extern "C" {
 		// Store the plugin self pointer — valid for the plugin's entire lifetime
 		g_self = self;
 
-		LOG_INFO("Plugin initializing...");
+		LOG_INFO("Plugin initializing (%s build)...", kBuildFlavour);
 
 		// Initialize config system
 		ProductionViewerConfig::Config::Initialize(self);
@@ -68,6 +94,11 @@ extern "C" {
 
 		// Resolve the per-plugin data folder (<Plugins>\ProductionViewer\)
 		ProductionViewer::Storage::Initialize(self);
+
+		// Register the packet handlers before anything can produce or receive
+		// data. The server is the sole authority in multiplayer; clients track
+		// nothing of their own and display only what arrives from here.
+		ProductionNet::Init(self);
 
 		// Register the Production Viewer ImGui window
 		ProductionUI::Init(self);
@@ -85,6 +116,9 @@ extern "C" {
 		if (self->hooks->World)
 			self->hooks->World->RegisterOnExperienceLoadComplete(&OnExperienceLoadComplete);
 
+		if (self->hooks->Players)
+			self->hooks->Players->RegisterOnPlayerJoined(&OnPlayerJoined);
+
 		// Hot-reload: experience-load-complete may have already fired before we
 		// registered, so if a session is already in progress, load it now.
 		OnExperienceLoadComplete();
@@ -101,6 +135,10 @@ extern "C" {
 		if (g_self && g_self->hooks->World)
 			g_self->hooks->World->UnregisterOnExperienceLoadComplete(&OnExperienceLoadComplete);
 
+		if (g_self && g_self->hooks->Players)
+			g_self->hooks->Players->UnregisterOnPlayerJoined(&OnPlayerJoined);
+
+		ProductionNet::Shutdown(g_self);
 		ProductionTracker::Shutdown(g_self);
 		ProductionIcons::Shutdown();
 		ProductionWaypoint::Shutdown(g_self);

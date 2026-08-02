@@ -4,6 +4,7 @@
 #include "production_mass.h"
 #include "production_basecore.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
+#include "Plugin Core/Net/production_net.h"
 #include "Plugin Core/Signatures/plugin_signatures.h"
 #include "Plugin Core/Storage/production_storage.h"
 
@@ -52,6 +53,12 @@ namespace ProductionTracker
 		std::map<std::string, ItemRecord> g_items; // key: UniqueItemName
 		float g_saveTimer = 0.0f;
 
+		// The session file is only loaded once the session role is known: a
+		// multiplayer client must not restore (or later overwrite) a local
+		// save's totals with the server's numbers, and the role isn't resolved
+		// yet when the experience finishes loading.
+		bool g_sessionLoadPending = false;
+
 		// Resolves a stable key + display name for an item, falling back to the
 		// key itself if no localized display name is available.
 		void ResolveItemNames(SDK::UAuItemDataBase* itemData, std::string& outKey, std::string& outDisplayName)
@@ -81,31 +88,61 @@ namespace ProductionTracker
 			std::string key, displayName;
 			ResolveItemNames(itemData, key, displayName);
 
-			std::lock_guard<std::mutex> lock(g_mutex);
-			ItemRecord& record = g_items[key];
-			if (record.displayName.empty())
-				record.displayName = displayName;
+			// One flattened description of where this craft happened, used for
+			// both the local aggregation and the wire. An empty `bases` means
+			// the crafter resolved to no base core area at all.
+			std::vector<ProductionNet::BaseSample> samples;
+			samples.reserve((std::max)(bases.size(), static_cast<size_t>(1)));
 
-			if (isProduction)
-				record.production.AddSample(amount);
-			else
-				record.consumption.AddSample(amount);
-
-			auto addToBase = [&record, amount, isProduction](uint64_t baseKey, const std::string& baseName)
+			auto addSample = [&samples](uint64_t baseKey, const std::string& baseName)
 			{
-				PerBaseRecord& perBase = record.perBase[baseKey];
-				perBase.baseName = baseName; // refreshed every sample so renames propagate
-				if (isProduction)
-					perBase.production.AddSample(amount);
-				else
-					perBase.consumption.AddSample(amount);
+				ProductionNet::BaseSample sample;
+				sample.key = baseKey;
+				sample.name = baseName;
+
+				SDK::FVector location{};
+				if (baseKey != 0 && ProductionBaseCore::GetBaseCoreLocation(baseKey, location))
+				{
+					sample.hasLocation = true;
+					sample.locX = static_cast<float>(location.X);
+					sample.locY = static_cast<float>(location.Y);
+					sample.locZ = static_cast<float>(location.Z);
+				}
+
+				samples.push_back(std::move(sample));
 			};
 
 			if (bases.empty())
-				addToBase(0, "Unknown Location");
+				addSample(0, "Unknown Location");
 			else
 				for (const ProductionBaseCore::BaseCoreInfo& base : bases)
-					addToBase(ProductionBaseCore::PackHandle(base.handle), base.name);
+					addSample(ProductionBaseCore::PackHandle(base.handle), base.name);
+
+			{
+				std::lock_guard<std::mutex> lock(g_mutex);
+				ItemRecord& record = g_items[key];
+				if (record.displayName.empty())
+					record.displayName = displayName;
+
+				if (isProduction)
+					record.production.AddSample(amount);
+				else
+					record.consumption.AddSample(amount);
+
+				for (const ProductionNet::BaseSample& sample : samples)
+				{
+					PerBaseRecord& perBase = record.perBase[sample.key];
+					perBase.baseName = sample.name; // refreshed every sample so renames propagate
+					if (isProduction)
+						perBase.production.AddSample(amount);
+					else
+						perBase.consumption.AddSample(amount);
+				}
+			}
+
+			// Deliberately outside the lock above: the network layer takes its
+			// own, and the client-side apply path runs in the opposite order.
+			ProductionNet::OnLocalSample(key, displayName, amount, isProduction, samples);
 		}
 
 		// Builds the persisted JSON blob for all tracked items.
@@ -129,6 +166,12 @@ namespace ProductionTracker
 		void SaveToSession()
 		{
 			if (!ProductionViewer::Storage::IsLoaded())
+				return;
+
+			// A client's totals belong to the server's world, not to whatever
+			// local save the session name happens to resolve to - writing them
+			// out would quietly overwrite the player's own history.
+			if (ProductionNet::IsRemoteClient())
 				return;
 
 			ProductionViewer::Storage::Set("items", BuildSaveData());
@@ -175,6 +218,14 @@ namespace ProductionTracker
 		void OnMassCraftingComplete(const SDK::FCrCraftingFragment* fragment, SDK::UWorld* world,
 			ProductionMass::FMassEntityHandle entity)
 		{
+			// A client only simulates the crafters the engine has streamed in
+			// around it, so anything counted here would be a fraction of the
+			// base presented as the whole of it. The server's feed is the only
+			// source on a client - bail before the base core query, which is
+			// the expensive part of this path.
+			if (ProductionNet::IsRemoteClient())
+				return;
+
 			LOG_DEBUG("ProductionTracker: OnMassCraftingComplete - fragment=%p CurrentRecipe=%p SelectedRecipe=%p CraftingMultiplier=%d",
 				fragment, fragment->CurrentRecipe, fragment->SelectedRecipe, fragment->CraftingMultiplier);
 
@@ -217,10 +268,33 @@ namespace ProductionTracker
 				RecordSample(resource.ItemDataBase, static_cast<float>(resource.Count * multiplier), false, bases);
 		}
 
+		// Restores the session file once the role is known. Deferred because
+		// OnExperienceLoadComplete fires before an actor exists to ask for the
+		// net mode, and a client must restore nothing.
+		void ServiceDeferredSessionLoad()
+		{
+			if (!g_sessionLoadPending)
+				return;
+			if (ProductionNet::GetRole() == ProductionNet::SessionRole::Unresolved)
+				return;
+
+			g_sessionLoadPending = false;
+
+			if (ProductionNet::IsRemoteClient())
+			{
+				LOG_INFO("ProductionTracker: multiplayer client - production data will come from the server");
+				return;
+			}
+
+			LoadFromSession();
+		}
+
 		void OnEngineTick(float deltaSeconds)
 		{
 			ProductionIcons::Tick();
 			ProductionBaseCore::Tick(deltaSeconds);
+			ProductionNet::Tick(deltaSeconds);
+			ServiceDeferredSessionLoad();
 
 			{
 				std::lock_guard<std::mutex> lock(g_mutex);
@@ -283,12 +357,15 @@ namespace ProductionTracker
 			std::lock_guard<std::mutex> lock(g_mutex);
 			g_items.clear();
 			g_saveTimer = 0.0f;
+			g_sessionLoadPending = true;
 		}
 
 		// Entity handles and cached locations don't survive a session change.
 		ProductionBaseCore::OnSessionLoaded();
 
-		LoadFromSession();
+		// Clients are told to drop what they hold; the restore itself waits for
+		// the session role (see ServiceDeferredSessionLoad).
+		ProductionNet::OnSessionLoaded();
 	}
 
 	const Category& GetItemsCategory(TimeRange range)
@@ -376,5 +453,75 @@ namespace ProductionTracker
 		std::sort(items.consumption.begin(), items.consumption.end(), byTotalDesc);
 
 		return items;
+	}
+
+	void Clear()
+	{
+		std::lock_guard<std::mutex> lock(g_mutex);
+		g_items.clear();
+	}
+
+	void GetAllTimeTotals(const std::string& itemKey, float& outProduced,
+		float& outConsumed, float& outElapsedSeconds)
+	{
+		outProduced = 0.0f;
+		outConsumed = 0.0f;
+		outElapsedSeconds = 0.0f;
+
+		std::lock_guard<std::mutex> lock(g_mutex);
+		auto it = g_items.find(itemKey);
+		if (it == g_items.end())
+			return;
+
+		outProduced = it->second.production.GetTotal(TimeRange::All);
+		outConsumed = it->second.consumption.GetTotal(TimeRange::All);
+
+		// Both aggregators are ticked together, so either one describes how
+		// long the item has been tracked.
+		outElapsedSeconds = it->second.production.GetAllTimeElapsed();
+	}
+
+	void SetRemoteBaseLocation(uint64_t baseKey, float x, float y, float z)
+	{
+		ProductionBaseCore::SetRemoteBaseLocation(baseKey, x, y, z);
+	}
+
+	void SeedRemoteItem(const std::string& itemKey, const std::string& displayName,
+		float allTimeProduced, float allTimeConsumed, float allTimeElapsedSeconds)
+	{
+		std::lock_guard<std::mutex> lock(g_mutex);
+		ItemRecord& record = g_items[itemKey];
+		record.displayName = displayName;
+		record.production.SeedAllTime(allTimeProduced, allTimeElapsedSeconds);
+		record.consumption.SeedAllTime(allTimeConsumed, allTimeElapsedSeconds);
+	}
+
+	void ApplyRemoteItemDelta(const std::string& itemKey, float produced, float consumed)
+	{
+		std::lock_guard<std::mutex> lock(g_mutex);
+		auto it = g_items.find(itemKey);
+		if (it == g_items.end())
+			return;   // never defined by the server; nothing to attribute this to
+
+		if (produced > 0.0f)
+			it->second.production.AddSample(produced);
+		if (consumed > 0.0f)
+			it->second.consumption.AddSample(consumed);
+	}
+
+	void ApplyRemoteBaseDelta(const std::string& itemKey, uint64_t baseKey,
+		const std::string& baseName, float produced, float consumed)
+	{
+		std::lock_guard<std::mutex> lock(g_mutex);
+		auto it = g_items.find(itemKey);
+		if (it == g_items.end())
+			return;
+
+		PerBaseRecord& perBase = it->second.perBase[baseKey];
+		perBase.baseName = baseName;
+		if (produced > 0.0f)
+			perBase.production.AddSample(produced);
+		if (consumed > 0.0f)
+			perBase.consumption.AddSample(consumed);
 	}
 }

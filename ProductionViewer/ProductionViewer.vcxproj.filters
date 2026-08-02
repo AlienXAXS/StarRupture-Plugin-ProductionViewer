@@ -16,6 +16,9 @@
     <Filter Include="Plugin Core\Helpers">
       <UniqueIdentifier>{a1b2c3d4-0001-0001-0001-000000000003}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Plugin Core\Net">
+      <UniqueIdentifier>{a1b2c3d4-0001-0001-0001-000000000008}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Plugin Core\Signatures">
       <UniqueIdentifier>{a1b2c3d4-0001-0001-0001-000000000007}</UniqueIdentifier>
     </Filter>
@@ -56,6 +59,14 @@
     <!-- Plugin Core\Helpers -->
     <ClInclude Include="Plugin Core\Helpers\plugin_helpers.h">
       <Filter>Plugin Core\Helpers</Filter>
+    </ClInclude>
+
+    <!-- Plugin Core\Net -->
+    <ClInclude Include="Plugin Core\Net\production_net.h">
+      <Filter>Plugin Core\Net</Filter>
+    </ClInclude>
+    <ClInclude Include="Plugin Core\Net\production_packets.h">
+      <Filter>Plugin Core\Net</Filter>
     </ClInclude>
 
     <!-- Plugin Core\Signatures -->
@@ -125,6 +136,11 @@
     <!-- Plugin Core\Config -->
     <ClCompile Include="Plugin Core\Config\plugin_config.cpp">
       <Filter>Plugin Core\Config</Filter>
+    </ClCompile>
+
+    <!-- Plugin Core\Net -->
+    <ClCompile Include="Plugin Core\Net\production_net.cpp">
+      <Filter>Plugin Core\Net</Filter>
     </ClCompile>
 
     <!-- Plugin Core\Storage -->

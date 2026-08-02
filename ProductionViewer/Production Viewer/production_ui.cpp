@@ -4,6 +4,7 @@
 #include "production_waypoint.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
 #include "Plugin Core/Config/plugin_config.h"
+#include "Plugin Core/Net/production_net.h"
 
 #include "Engine_classes.hpp"
 
@@ -519,6 +520,34 @@ namespace ProductionUI
 			imgui->EndChild();
 		}
 
+		// Draws the multiplayer status line. Returns false when there is nothing
+		// worth drawing below it — on a client with no server feed the tables
+		// would otherwise sit empty with no explanation of why.
+		bool RenderNetStatus(IModLoaderImGui* imgui)
+		{
+			const ProductionNet::SessionRole role = ProductionNet::GetRole();
+			if (role != ProductionNet::SessionRole::RemoteClient)
+				return true;
+
+			const ProductionNet::WaitReason reason = ProductionNet::GetWaitReason();
+			const float age = ProductionNet::GetDataAgeSeconds();
+
+			if (reason == ProductionNet::WaitReason::None)
+			{
+				char status[96];
+				snprintf(status, sizeof(status), "Live from the server - updated %.0fs ago",
+					age < 0.0f ? 0.0f : age);
+				imgui->TextDisabled(status);
+				return true;
+			}
+
+			imgui->TextDisabled(ProductionNet::WaitReasonText(reason));
+
+			// A stale link still has the last known numbers, and they're more
+			// use than a blank panel — keep drawing them, just flagged.
+			return reason == ProductionNet::WaitReason::LinkStale;
+		}
+
 		// Top-level render callback registered with the panel.
 		void RenderProductionWindow(IModLoaderImGui* imgui)
 		{
@@ -544,6 +573,9 @@ namespace ProductionUI
 			imgui->Checkbox("Always keep expanded items at the top", &s_keepExpandedAtTop);
 
 			imgui->Separator();
+
+			if (!RenderNetStatus(imgui))
+				return;
 
 			const auto& items = GetCachedItems(ranges[s_selectedRangeIndex].value, s_selectedRangeIndex);
 			std::vector<std::string> searchTerms = ParseSearchTerms(s_searchBuffer);

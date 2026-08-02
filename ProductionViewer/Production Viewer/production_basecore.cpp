@@ -326,6 +326,15 @@ namespace ProductionBaseCore
 
 	void Tick(float deltaSeconds)
 	{
+		// The cached player location exists only to label base cores with a
+		// distance in the panel. A server build has no panel and no local
+		// player, so this would be a ProcessEvent call every second for a
+		// number nothing reads - distances are computed on each client from
+		// its own pawn and the base location the server replicated.
+		IPluginHooks* hooks = GetHooks();
+		if (!hooks || !hooks->UI)
+			return;
+
 		g_playerRefreshTimer += deltaSeconds;
 		if (g_playerRefreshTimer < kPlayerRefreshIntervalSeconds)
 			return;
@@ -369,6 +378,20 @@ namespace ProductionBaseCore
 
 		// World units are centimeters.
 		return static_cast<float>(std::sqrt(dx * dx + dy * dy + dz * dz) / 100.0);
+	}
+
+	void SetRemoteBaseLocation(uint64_t baseKey, float x, float y, float z)
+	{
+		if (baseKey == 0)
+			return;
+
+		SDK::FVector location{};
+		location.X = x;
+		location.Y = y;
+		location.Z = z;
+
+		std::lock_guard<std::mutex> lock(g_mutex);
+		g_baseLocations[baseKey] = location;
 	}
 
 	bool GetBaseCoreLocation(uint64_t baseKey, SDK::FVector& outLocation)

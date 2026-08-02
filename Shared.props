@@ -18,21 +18,32 @@
   <PropertyGroup Condition="'$(Configuration)' == 'Client Debug' Or '$(Configuration)' == 'Client Release'">
     <StarRuptureSDKSourceDir>$(GameSDKRoot)\Client\SDK\</StarRuptureSDKSourceDir>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Server Debug' Or '$(Configuration)' == 'Server Release'">
+    <StarRuptureSDKSourceDir>$(GameSDKRoot)\Server\SDK\</StarRuptureSDKSourceDir>
+  </PropertyGroup>
 
   <!-- ============================================================
        StarRuptureSDKConfigDir
-       Additional include directories for Client builds.
+       Additional include directories for Client/Server builds.
        ============================================================ -->
   <PropertyGroup Condition="'$(Configuration)' == 'Client Debug' Or '$(Configuration)' == 'Client Release'">
     <StarRuptureSDKConfigDir>$(GameSDKRoot)\Client\;$(GameSDKRoot)\Client\SDK\</StarRuptureSDKConfigDir>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Server Debug' Or '$(Configuration)' == 'Server Release'">
+    <StarRuptureSDKConfigDir>$(GameSDKRoot)\Server\;$(GameSDKRoot)\Server\SDK\</StarRuptureSDKConfigDir>
+  </PropertyGroup>
 
   <!-- ============================================================
-       MODLOADER_CLIENT_BUILD
+       MODLOADER_CLIENT_BUILD / MODLOADER_SERVER_BUILD
        ============================================================ -->
   <ItemDefinitionGroup Condition="'$(Configuration)' == 'Client Debug' Or '$(Configuration)' == 'Client Release'">
     <ClCompile>
       <PreprocessorDefinitions>MODLOADER_CLIENT_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)' == 'Server Debug' Or '$(Configuration)' == 'Server Release'">
+    <ClCompile>
+      <PreprocessorDefinitions>MODLOADER_SERVER_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
 

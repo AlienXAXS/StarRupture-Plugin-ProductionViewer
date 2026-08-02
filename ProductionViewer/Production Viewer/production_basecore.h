@@ -73,4 +73,12 @@ namespace ProductionBaseCore
 	// as of its most recent QueryBaseCores resolution. Returns false if never
 	// resolved. Safe to call from the UI/render path - only reads cached data.
 	bool GetBaseCoreLocation(uint64_t baseKey, SDK::FVector& outLocation);
+
+	// Records a location the server reported for a base core, rather than one
+	// this process resolved. A multiplayer client never runs QueryBaseCores -
+	// it has no craft completions to trigger it, and the Mass entity handle in
+	// baseKey belongs to the server's process anyway - so this is the only way
+	// distances and the "Go" waypoint work for a client. Takes plain floats so
+	// the network layer needs no SDK types.
+	void SetRemoteBaseLocation(uint64_t baseKey, float x, float y, float z);
 }

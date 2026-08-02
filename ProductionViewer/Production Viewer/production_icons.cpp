@@ -34,6 +34,12 @@ namespace ProductionIcons
 		bool                                        g_iconsLoaded = false;
 		bool                                         g_needsRetry  = false; // some textures returned NULL (D3D12 not ready yet)
 
+		// False on a server/generic build, where there is no texture interface
+		// to load into. Without it Tick()'s "not loaded yet, retry" path would
+		// spin on every frame for the life of the process, chasing an icon list
+		// that can never arrive.
+		bool g_available = false;
+
 		bool HasMissingHandles(const std::unordered_map<std::string, IconEntry>& icons)
 		{
 			for (const auto& [key, entry] : icons)
@@ -390,6 +396,7 @@ namespace ProductionIcons
 			return;
 		}
 
+		g_available = true;
 		RequestRefresh();
 	}
 
@@ -398,10 +405,14 @@ namespace ProductionIcons
 		FreeIconTexHandles(g_icons);
 		g_icons.clear();
 		g_iconsLoaded = false;
+		g_available   = false;
 	}
 
 	void Tick()
 	{
+		if (!g_available)
+			return;
+
 		AdoptPendingIconsIfReady();
 
 		// Initial scan hasn't completed yet (e.g. the Init-time post never ran) -
