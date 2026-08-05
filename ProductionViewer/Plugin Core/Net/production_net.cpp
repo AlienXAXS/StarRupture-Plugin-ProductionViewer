@@ -138,6 +138,10 @@ namespace ProductionNet
 		float    g_helloCooldown    = 0.0f;
 		bool     g_helloPending     = true;
 
+		// Set from the loader's server-ready callback, which carries no promise
+		// about which thread it lands on; the tick consumes it.
+		std::atomic<bool> g_serverReadySignal{ false };
+
 		// ---- Small helpers ------------------------------------------------
 
 		void CopyFixed(char* dst, int capacity, const std::string& src)
@@ -594,11 +598,36 @@ namespace ProductionNet
 			SendSnapshotTo(senderController);
 		}
 
+		// Authority: this client has now reported our plugin at our version, so
+		// this is the first moment a packet to it can actually land. It is
+		// strictly later than the player-joined hook - see Init.
+		void OnClientReady(void* playerController)
+		{
+			SendSnapshotTo(playerController);
+		}
+
+		// Client: the authority has acknowledged our manifest. Ask for a
+		// snapshot right now rather than waiting out the retry cooldown.
+		void OnServerReady(const char* serverBuildTag)
+		{
+			LOG_INFO("ProductionNet: server link ready (loader build %s)",
+				serverBuildTag ? serverBuildTag : "unknown");
+			g_serverReadySignal.store(true, std::memory_order_relaxed);
+		}
+
 		void SendHello()
 		{
 			IPluginSelf* self = GetSelf();
 			IPluginHooks* hooks = GetHooks();
 			if (!self || !hooks || !hooks->Network)
+				return;
+
+			// The net mode resolves to Client well before the authority has
+			// acknowledged our manifest, and anything sent in between is dropped
+			// (and warned about). Leave the request pending with its cooldown
+			// untouched so it goes out on the frame the link opens, instead of
+			// burning a retry interval on a packet nobody will see.
+			if (!hooks->Network->IsServerReady())
 				return;
 
 			PvHelloPacket hello{};
@@ -637,6 +666,12 @@ namespace ProductionNet
 		{
 			if (g_helloCooldown > 0.0f)
 				g_helloCooldown -= deltaSeconds;
+
+			if (g_serverReadySignal.exchange(false, std::memory_order_relaxed))
+			{
+				g_helloPending  = true;
+				g_helloCooldown = 0.0f;
+			}
 
 			if (g_helloPending && g_helloCooldown <= 0.0f)
 				SendHello();
@@ -700,6 +735,14 @@ namespace ProductionNet
 
 #if defined(MODLOADER_SERVER_BUILD)
 		g_helloHandler = Network::OnServerReceive<PvHelloPacket>(hooks, self, &OnHelloPacket);
+
+		// Deliberately NOT the player-joined hook: a client is not ready when
+		// PostLogin fires - it has not reported this plugin at this version yet,
+		// so a snapshot sent there is dropped on the floor. This fires at the
+		// first moment one can arrive, and fires immediately for every client
+		// already in the session, so a hot-loaded plugin still feeds them.
+		hooks->Network->RegisterClientReadyCallback(self, &OnClientReady);
+
 		LOG_INFO("ProductionNet: serving production data to clients");
 #else
 		g_itemDefHandler = Network::OnReceive<PvItemDefPacket>(hooks, self, &OnItemDefPacket);
@@ -709,8 +752,13 @@ namespace ProductionNet
 
 		// A listen host is a server too, so it answers hellos - but only a
 		// MODLOADER_SERVER_BUILD can actually send to clients, so on this build
-		// the registration (and the reply) is a documented no-op.
+		// the registration (and the reply) is a documented no-op. Registering
+		// the client-ready callback here would be one too, and would warn: this
+		// process is not the authority at load time.
 		g_helloHandler = Network::OnServerReceive<PvHelloPacket>(hooks, self, &OnHelloPacket);
+
+		// The mirror of the above, for our own outgoing hello.
+		hooks->Network->RegisterServerReadyCallback(self, &OnServerReady);
 #endif
 	}
 
@@ -729,6 +777,12 @@ namespace ProductionNet
 				hooks->Network->UnregisterMessageHandler(self, typeid(PvResetPacket).name(), g_resetHandler);
 			if (g_helloHandler)
 				hooks->Network->UnregisterServerMessageHandler(self, typeid(PvHelloPacket).name(), g_helloHandler);
+
+#if defined(MODLOADER_SERVER_BUILD)
+			hooks->Network->UnregisterClientReadyCallback(self, &OnClientReady);
+#else
+			hooks->Network->UnregisterServerReadyCallback(self, &OnServerReady);
+#endif
 		}
 
 		g_itemDefHandler = nullptr;

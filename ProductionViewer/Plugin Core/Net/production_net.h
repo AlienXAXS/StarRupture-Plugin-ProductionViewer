@@ -101,6 +101,9 @@ namespace ProductionNet
 
 	// Server: push the full dictionary and current totals to one player, so a
 	// joining client doesn't sit on an empty panel until something gets crafted.
+	// Queued and sent on the next authority tick. Driven by the loader's
+	// client-ready callback, never by player-joined: a client is not reachable
+	// yet at PostLogin, and packets sent then are dropped, not buffered.
 	void SendSnapshotTo(void* playerController);
 
 	SessionRole GetRole();

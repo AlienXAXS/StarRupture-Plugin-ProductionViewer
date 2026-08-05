@@ -61,13 +61,6 @@ static void OnExperienceLoadComplete()
 	ProductionTracker::OnSessionLoaded();
 }
 
-// Server-side: a joining player would otherwise stare at an empty panel until
-// something happened to get crafted.
-static void OnPlayerJoined(void* playerController)
-{
-	ProductionNet::SendSnapshotTo(playerController);
-}
-
 extern "C" {
 
 	__declspec(dllexport) PluginInfo* GetPluginInfo()
@@ -116,8 +109,9 @@ extern "C" {
 		if (self->hooks->World)
 			self->hooks->World->RegisterOnExperienceLoadComplete(&OnExperienceLoadComplete);
 
-		if (self->hooks->Players)
-			self->hooks->Players->RegisterOnPlayerJoined(&OnPlayerJoined);
+		// Note: the join-time snapshot is NOT driven from a player-joined hook.
+		// ProductionNet::Init registers for client-ready instead, which is the
+		// first moment a packet to that client can actually be delivered.
 
 		// Hot-reload: experience-load-complete may have already fired before we
 		// registered, so if a session is already in progress, load it now.
@@ -134,9 +128,6 @@ extern "C" {
 
 		if (g_self && g_self->hooks->World)
 			g_self->hooks->World->UnregisterOnExperienceLoadComplete(&OnExperienceLoadComplete);
-
-		if (g_self && g_self->hooks->Players)
-			g_self->hooks->Players->UnregisterOnPlayerJoined(&OnPlayerJoined);
 
 		ProductionNet::Shutdown(g_self);
 		ProductionTracker::Shutdown(g_self);
