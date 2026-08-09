@@ -481,6 +481,47 @@ namespace ProductionTracker
 		outElapsedSeconds = it->second.production.GetAllTimeElapsed();
 	}
 
+	void GetReplicationSnapshot(std::vector<ItemTotals>& outItems, std::vector<BaseTotals>& outBases)
+	{
+		outItems.clear();
+		outBases.clear();
+
+		std::lock_guard<std::mutex> lock(g_mutex);
+		outItems.reserve(g_items.size());
+
+		for (const auto& [key, record] : g_items)
+		{
+			ItemTotals item;
+			item.key            = key;
+			item.displayName    = record.displayName.empty() ? key : record.displayName;
+			item.produced       = record.production.GetTotal(TimeRange::All);
+			item.consumed       = record.consumption.GetTotal(TimeRange::All);
+			item.elapsedSeconds = record.production.GetAllTimeElapsed();
+			outItems.push_back(std::move(item));
+
+			for (const auto& [baseKey, perBase] : record.perBase)
+			{
+				BaseTotals base;
+				base.key      = key;
+				base.baseKey  = baseKey;
+				base.baseName = perBase.baseName;
+				base.produced = perBase.production.GetTotal(TimeRange::All);
+				base.consumed = perBase.consumption.GetTotal(TimeRange::All);
+
+				SDK::FVector location{};
+				if (baseKey != 0 && ProductionBaseCore::GetBaseCoreLocation(baseKey, location))
+				{
+					base.hasLocation = true;
+					base.locX = static_cast<float>(location.X);
+					base.locY = static_cast<float>(location.Y);
+					base.locZ = static_cast<float>(location.Z);
+				}
+
+				outBases.push_back(std::move(base));
+			}
+		}
+	}
+
 	void SetRemoteBaseLocation(uint64_t baseKey, float x, float y, float z)
 	{
 		ProductionBaseCore::SetRemoteBaseLocation(baseKey, x, y, z);
@@ -523,5 +564,23 @@ namespace ProductionTracker
 			perBase.production.AddSample(produced);
 		if (consumed > 0.0f)
 			perBase.consumption.AddSample(consumed);
+	}
+
+	void SeedRemoteBase(const std::string& itemKey, uint64_t baseKey,
+		const std::string& baseName, float allTimeProduced, float allTimeConsumed)
+	{
+		std::lock_guard<std::mutex> lock(g_mutex);
+		auto it = g_items.find(itemKey);
+		if (it == g_items.end())
+			return;
+
+		PerBaseRecord& perBase = it->second.perBase[baseKey];
+		perBase.baseName = baseName;
+
+		// Elapsed is left as this client measured it. Nothing reads a per-base
+		// All Time *rate* - the breakdown rows show a total and a 1m rate, and
+		// the latter comes from the delta-driven tier.
+		perBase.production.SeedAllTime(allTimeProduced, perBase.production.GetAllTimeElapsed());
+		perBase.consumption.SeedAllTime(allTimeConsumed, perBase.consumption.GetAllTimeElapsed());
 	}
 }

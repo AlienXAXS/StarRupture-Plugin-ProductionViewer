@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 // Live production/consumption tracking.
 //
@@ -55,6 +56,42 @@ namespace ProductionTracker
 	void GetAllTimeTotals(const std::string& itemKey, float& outProduced,
 		float& outConsumed, float& outElapsedSeconds);
 
+	// ---- Replication snapshot (authority) --------------------------------
+
+	// One item's All Time figures, as replicated.
+	struct ItemTotals
+	{
+		std::string key;
+		std::string displayName;
+		float produced       = 0.0f;
+		float consumed       = 0.0f;
+		float elapsedSeconds = 0.0f;
+	};
+
+	// One item's All Time figures for one base core. Locations are resolved here
+	// rather than by the caller so the network layer stays free of SDK types.
+	struct BaseTotals
+	{
+		std::string key;                // the item, not the base
+		uint64_t    baseKey = 0;        // 0 = "Unknown Location"
+		std::string baseName;
+		float       produced = 0.0f;
+		float       consumed = 0.0f;
+
+		bool  hasLocation = false;
+		float locX = 0.0f, locY = 0.0f, locZ = 0.0f;
+	};
+
+	// Everything this authority currently knows, read under one lock so the item
+	// totals and the per-base totals describe the same instant.
+	//
+	// This is deliberately the whole tracker rather than the items that happen to
+	// have been crafted since the process started: a save restored from disk
+	// carries items whose production has since stopped, and those are exactly the
+	// ones an incremental feed can never mention.
+	void GetReplicationSnapshot(std::vector<ItemTotals>& outItems,
+		std::vector<BaseTotals>& outBases);
+
 	// Forwards a base core location the server reported to ProductionBaseCore.
 	// Routed through here so the network layer stays free of SDK types.
 	void SetRemoteBaseLocation(uint64_t baseKey, float x, float y, float z);
@@ -75,4 +112,10 @@ namespace ProductionTracker
 	// local path.
 	void ApplyRemoteBaseDelta(const std::string& itemKey, uint64_t baseKey,
 		const std::string& baseName, float produced, float consumed);
+
+	// The per-base counterpart of SeedRemoteItem: replaces a breakdown row's All
+	// Time totals with the server's. Ignored if the item was never defined - the
+	// item defs of a sync always precede its per-base totals.
+	void SeedRemoteBase(const std::string& itemKey, uint64_t baseKey,
+		const std::string& baseName, float allTimeProduced, float allTimeConsumed);
 }

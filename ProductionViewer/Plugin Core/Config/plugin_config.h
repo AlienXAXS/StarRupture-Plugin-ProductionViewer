@@ -32,6 +32,14 @@ namespace ProductionViewerConfig
 			ConfigValueType::Float,
 			"10.0",
 			"Seconds without a server update before a client flags its production data as stale"
+		},
+		{
+			"Network",
+			"FullSyncInterval",
+			ConfigValueType::Float,
+			"10.0",
+			"Seconds between full production snapshots sent from the server to clients. "
+			"Lower corrects drift sooner and costs more bandwidth"
 		}
 	};
 
@@ -85,6 +93,16 @@ namespace ProductionViewerConfig
 		{
 			const float value = s_self ? s_self->config->ReadFloat(s_self, "Network", "StaleAfterSeconds", 10.0f) : 10.0f;
 			return value < 6.0f ? 6.0f : (value > 300.0f ? 300.0f : value);
+		}
+
+		// How often the server re-states every figure it holds, rather than just
+		// what changed. This is the only thing that repairs a lost packet, so it
+		// is also the bound on how far a client can drift; the floor keeps a big
+		// base from spending most of its bandwidth on snapshots.
+		static float GetFullSyncInterval()
+		{
+			const float value = s_self ? s_self->config->ReadFloat(s_self, "Network", "FullSyncInterval", 10.0f) : 10.0f;
+			return value < 5.0f ? 5.0f : (value > 300.0f ? 300.0f : value);
 		}
 
 	private:

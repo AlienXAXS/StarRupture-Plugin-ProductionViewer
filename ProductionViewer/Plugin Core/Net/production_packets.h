@@ -15,7 +15,7 @@
 // runs are split across several packets.
 namespace ProductionNet
 {
-	constexpr uint8_t kSchemaVersion = 1;
+	constexpr uint8_t kSchemaVersion = 2;
 
 	// Fixed string capacities, all including the null terminator. Item keys are
 	// UAuItemDataBase::UniqueItemName (short internal identifiers); base names
@@ -27,9 +27,10 @@ namespace ProductionNet
 	// Entries per packet, sized so every payload stays well under the
 	// ModLoader's 1400-byte limit (packets travel base64-encoded inside a
 	// gameplay RPC, so the encoded form is a third larger again).
-	constexpr int kItemDefsPerPacket = 4;   // 456-byte payload
-	constexpr int kBaseDefsPerPacket = 6;   // 440-byte payload
-	constexpr int kDeltasPerPacket   = 64;  // 780-byte payload
+	constexpr int kItemDefsPerPacket  = 4;   // 456-byte payload
+	constexpr int kBaseDefsPerPacket  = 6;   // 440-byte payload
+	constexpr int kDeltasPerPacket    = 64;  // 780-byte payload
+	constexpr int kBaseStatsPerPacket = 64;  // 776-byte payload
 
 	// A delta addressed to the item's own totals rather than to one of its base
 	// cores. Item totals are not the sum of the per-base figures - a crafter
@@ -43,6 +44,10 @@ namespace ProductionNet
 	// the high-frequency delta packets can carry ids instead of strings, and
 	// seeds the client's All Time totals from the server's so a joining player
 	// sees the base's real history instead of starting from zero.
+	//
+	// The totals are absolute, and the client applies them by overwrite, so
+	// re-sending this packet costs nothing but bandwidth and repairs any amount
+	// of accumulated drift. That is what the periodic full sync relies on.
 	struct PvItemDefPacket
 	{
 		uint8_t  schemaVersion;
@@ -91,6 +96,11 @@ namespace ProductionNet
 	// client keeps the totals it already holds, and its own rolling windows
 	// decay on their own. That is the whole compression scheme - a base running
 	// unchanged costs nothing beyond the packet header.
+	//
+	// Deltas are the only thing on the wire that is NOT self-correcting: one lost
+	// packet is one interval of production the client will never hear about
+	// again. The periodic full sync (absolute totals) is what bounds that error,
+	// and the sequence number below is what makes the loss visible in the log.
 	struct PvDeltaPacket
 	{
 		uint8_t  schemaVersion;
@@ -106,6 +116,30 @@ namespace ProductionNet
 			float    produced;
 			float    consumed;
 		} entries[kDeltasPerPacket];
+	};
+
+	// Absolute per-base-core totals, the counterpart of PvItemDefPacket for the
+	// breakdown rows. Deltas alone can only ever describe the time since a client
+	// connected, and unlike the item totals there is nowhere else for the real
+	// figures to ride along - so they travel here, and are applied by overwrite.
+	//
+	// Only the All Time totals are carried. The client's rolling 1m/10m/1h tiers
+	// stay delta-driven and so cover the time since it synced, exactly as they do
+	// for the item-level figures.
+	struct PvBaseStatsPacket
+	{
+		uint8_t  schemaVersion;
+		uint8_t  count;
+		uint16_t reserved;
+		uint32_t generation;
+
+		struct Entry
+		{
+			uint16_t itemId;
+			uint16_t baseId;     // never kBaseIdItemTotal - item totals ride in the def
+			float    produced;   // all time, not an interval
+			float    consumed;
+		} entries[kBaseStatsPerPacket];
 	};
 
 	// Broadcast when the server switches save. Everything the client holds
@@ -128,9 +162,10 @@ namespace ProductionNet
 
 #pragma pack(pop)
 
-	static_assert(sizeof(PvItemDefPacket)  == 456, "PvItemDefPacket layout changed");
-	static_assert(sizeof(PvBaseDefPacket)  == 440, "PvBaseDefPacket layout changed");
-	static_assert(sizeof(PvDeltaPacket)    == 780, "PvDeltaPacket layout changed");
-	static_assert(sizeof(PvResetPacket)    == 8,   "PvResetPacket layout changed");
-	static_assert(sizeof(PvHelloPacket)    == 4,   "PvHelloPacket layout changed");
+	static_assert(sizeof(PvItemDefPacket)   == 456, "PvItemDefPacket layout changed");
+	static_assert(sizeof(PvBaseDefPacket)   == 440, "PvBaseDefPacket layout changed");
+	static_assert(sizeof(PvDeltaPacket)     == 780, "PvDeltaPacket layout changed");
+	static_assert(sizeof(PvBaseStatsPacket) == 776, "PvBaseStatsPacket layout changed");
+	static_assert(sizeof(PvResetPacket)     == 8,   "PvResetPacket layout changed");
+	static_assert(sizeof(PvHelloPacket)     == 4,   "PvHelloPacket layout changed");
 }

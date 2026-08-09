@@ -19,12 +19,19 @@
 // amounts crafted since the last broadcast go over the wire, and anything that
 // produced nothing in an interval is simply left out (see production_packets.h).
 //
-// Note on listen hosts: the ModLoader's network channel can only send to
-// clients from a MODLOADER_SERVER_BUILD - on a client build
-// SendPacketToAllClients is a no-op. A listen host therefore keeps working as
-// its own local authority (it sees its own data) but cannot feed anyone. The
-// role plumbing below already treats it as an authority, so it starts
-// broadcasting for free if that ever changes.
+// On top of that sits a periodic full sync: every FullSyncInterval seconds the
+// authority re-states every figure it holds, in absolute terms, and the client
+// takes those over whatever it had. Deltas are the only part of the feed that
+// cannot heal - one lost packet is one interval of production a client would
+// otherwise never hear about again - and the incremental path alone can only
+// ever describe items something has crafted since the process started, never
+// the ones a restored save is still carrying. The full sync answers both, and
+// is why the two ends converge instead of drifting apart.
+//
+// Note on listen hosts: a listen host is a client build that holds net
+// authority, which is a runtime property. It broadcasts to its clients like any
+// other authority - see EnsureClientReadyRegistered for the one piece of that
+// which cannot be set up at load time.
 namespace ProductionNet
 {
 	// Where this plugin instance sits in the session. Resolved from
