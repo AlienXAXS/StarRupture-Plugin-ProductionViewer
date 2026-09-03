@@ -43,6 +43,10 @@ namespace ProductionMass
 	// Returns false (and logs a warning) if any required pattern could not be
 	// resolved; in that case Mass-simulated crafting will not be tracked, but
 	// the actor-hook path keeps working.
+	// Resolves every AOB this module needs. Callable only from the plugin's
+	// OnPluginLoadHooks export -- the loader refuses scans made anywhere else.
+	void ResolvePatterns(IPluginSelf* self, IPluginHookScanner* scanner);
+
 	bool Init(IPluginSelf* self, CraftingCompleteCallback callback);
 
 	// Removes the SignalEntity hook installed by Init.

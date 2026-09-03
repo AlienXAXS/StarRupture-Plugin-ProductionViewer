@@ -68,6 +68,15 @@ extern "C" {
 		return &s_pluginInfo;
 	}
 
+	// Runs after GetPluginInfo and before PluginInit, and is the only context in
+	// which the loader lets a plugin pattern scan. Resolve here, install from
+	// PluginInit — self->hooks is null for the duration of this event.
+	__declspec(dllexport) void OnPluginLoadHooks(IPluginSelf* self, IPluginHookScanner* scanner)
+	{
+		g_self = self;
+		ProductionTracker::ResolvePatterns(self, scanner);
+	}
+
 	__declspec(dllexport) bool PluginInit(IPluginSelf* self)
 	{
 		// Store the plugin self pointer — valid for the plugin's entire lifetime

@@ -119,16 +119,13 @@ namespace ProductionMass
 		}
 
 		// UWorld::GetSubsystem<UMassEntitySubsystem>()
-		bool ResolveGetMassEntitySubsystem()
+		bool ResolveGetMassEntitySubsystem(IPluginSelf* self, IPluginHookScanner* scanner)
 		{
-			IPluginScanner* scanner = GetScanner();
-			if (!scanner)
-				return false;
-
-			uintptr_t addr = scanner->FindPatternInMainModule(Signatures::GetMassEntitySubsystem);
+			uintptr_t addr = scanner->ResolveOptional(
+				self, "UWorld::GetSubsystem<UMassEntitySubsystem>", Signatures::GetMassEntitySubsystem);
 			if (!addr)
 			{
-				LOG_WARN("ProductionMass: UWorld::GetSubsystem<UMassEntitySubsystem> pattern not found");
+				LOG_WARN("ProductionMass: UWorld::GetSubsystem<UMassEntitySubsystem> unresolved");
 				return false;
 			}
 
@@ -201,22 +198,21 @@ namespace ProductionMass
 		// reach the function entry. From there, see
 		// Signatures::GetMassFragment_StaticStructCallOffset/
 		// GetMassFragment_GetFragmentDataPtrCallOffset for the call/jmp offsets.
-		bool ResolveFragmentAccessors()
+		bool ResolveFragmentAccessors(IPluginSelf* self, IPluginHookScanner* scanner)
 		{
-			IPluginScanner* scanner = GetScanner();
-			if (!scanner)
-				return false;
-
 			if (!*Signatures::GetMassFragment_FCrCraftingFragment)
 			{
+				scanner->ReportWarning(self, "GetMassFragment<FCrCraftingFragment>",
+					"Pattern is not set -- Mass-simulated crafting will not be tracked.");
 				LOG_WARN("ProductionMass: GetMassFragment<FCrCraftingFragment> pattern not set");
 				return false;
 			}
 
-			uintptr_t addr = scanner->FindPatternInMainModule(Signatures::GetMassFragment_FCrCraftingFragment);
+			uintptr_t addr = scanner->ResolveOptional(
+				self, "GetMassFragment<FCrCraftingFragment>", Signatures::GetMassFragment_FCrCraftingFragment);
 			if (!addr)
 			{
-				LOG_WARN("ProductionMass: GetMassFragment<FCrCraftingFragment> pattern not found");
+				LOG_WARN("ProductionMass: GetMassFragment<FCrCraftingFragment> unresolved");
 				return false;
 			}
 
@@ -227,6 +223,8 @@ namespace ProductionMass
 				fragmentFn = FollowRelCall(addr);
 				if (!fragmentFn)
 				{
+					scanner->ReportWarning(self, "GetMassFragment<FCrCraftingFragment>",
+						"Xref AOB matched but the E8 rel32 call follow failed -- Mass-simulated crafting will not be tracked.");
 					LOG_WARN("ProductionMass: ResolveFragmentAccessors - xref AOB call follow failed");
 					return false;
 				}
@@ -246,6 +244,8 @@ namespace ProductionMass
 			if (!LooksLikeCodePointer(reinterpret_cast<void*>(staticStructAddr)) ||
 				!LooksLikeCodePointer(reinterpret_cast<void*>(getFragmentDataPtrAddr)))
 			{
+				scanner->ReportWarning(self, "GetMassFragment<FCrCraftingFragment>",
+					"Resolved StaticStruct/GetFragmentDataPtr fall outside the main module; the call offsets are likely wrong.");
 				LOG_WARN("ProductionMass: ResolveFragmentAccessors - resolved StaticStruct=0x%llX or "
 					"GetFragmentDataPtr=0x%llX fall outside the main module; offsets are likely wrong - "
 					"aborting before they're called",
@@ -264,18 +264,18 @@ namespace ProductionMass
 		// UMassSignalSubsystem::SignalEntity(UMassSignalSubsystem*, FName, FMassEntityHandle)
 		// Called for every Mass entity (loaded or simulated) whenever a signal fires,
 		// including CrMassSignals::CraftingItemComplete on craft completion.
-		uintptr_t ResolveSignalEntity()
+		uintptr_t ResolveSignalEntity(IPluginSelf* self, IPluginHookScanner* scanner)
 		{
-			IPluginScanner* scanner = GetScanner();
-			if (!scanner)
-				return 0;
-
-			uintptr_t addr = scanner->FindPatternInMainModule(Signatures::MassSignalSubsystem_SignalEntity);
+			uintptr_t addr = scanner->ResolveOptional(
+				self, "UMassSignalSubsystem::SignalEntity", Signatures::MassSignalSubsystem_SignalEntity);
 			if (!addr)
-				LOG_WARN("ProductionMass: UMassSignalSubsystem::SignalEntity pattern not found");
+				LOG_WARN("ProductionMass: UMassSignalSubsystem::SignalEntity unresolved");
 
 			return addr;
 		}
+
+		// Resolved during OnPluginLoadHooks; 0 means the pattern missed on this build.
+		uintptr_t g_signalEntityAddr = 0;
 	}
 
 	bool GetEntityLocation(SDK::UWorld* world, FMassEntityHandle entity, SDK::FVector& outLocation)
@@ -329,22 +329,38 @@ namespace ProductionMass
 		return true;
 	}
 
+	void ResolvePatterns(IPluginSelf* self, IPluginHookScanner* scanner)
+	{
+		if (!self || !scanner)
+			return;
+
+		// Optional throughout: a miss costs Mass-simulated crafting tracking but
+		// leaves the actor-based tracker working, which is what the old
+		// scan-at-init path did.
+		if (!ResolveGetMassEntitySubsystem(self, scanner))
+			return;
+
+		if (!ResolveFragmentAccessors(self, scanner))
+			return;
+
+		g_signalEntityAddr = ResolveSignalEntity(self, scanner);
+	}
+
 	bool Init(IPluginSelf* self, CraftingCompleteCallback callback)
 	{
-		IPluginScanner* scanner = GetScanner();
-		if (!scanner || !self->hooks->Hooks)
+		if (!self->hooks->Hooks)
 		{
-			LOG_WARN("ProductionMass: scanner/hooks unavailable - Mass-simulated crafting will not be tracked");
+			LOG_WARN("ProductionMass: hooks unavailable - Mass-simulated crafting will not be tracked");
 			return false;
 		}
 
-		if (!ResolveGetMassEntitySubsystem())
+		if (!g_getMassEntitySubsystem || !g_getFragmentDataPtr)
+		{
+			LOG_WARN("ProductionMass: Mass accessors unresolved - Mass-simulated crafting will not be tracked");
 			return false;
+		}
 
-		if (!ResolveFragmentAccessors())
-			return false;
-
-		uintptr_t signalEntityAddr = ResolveSignalEntity();
+		const uintptr_t signalEntityAddr = g_signalEntityAddr;
 		if (!signalEntityAddr)
 			return false;
 

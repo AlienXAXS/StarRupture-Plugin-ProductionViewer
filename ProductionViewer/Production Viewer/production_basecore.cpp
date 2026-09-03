@@ -227,21 +227,18 @@ namespace ProductionBaseCore
 		}
 	}
 
-	bool Init(IPluginSelf* self)
+	bool ResolvePatterns(IPluginSelf* self, IPluginHookScanner* scanner)
 	{
-		(void)self;
-
-		IPluginScanner* scanner = GetScanner();
-		if (!scanner)
-		{
-			LOG_WARN("ProductionBaseCore: scanner unavailable - items will report 'Unknown Location'");
+		if (!self || !scanner)
 			return false;
-		}
 
-		uintptr_t queryAddr = scanner->FindPatternInMainModule(Signatures::GetBaseCoresRangedBuilding);
+		// Optional throughout: a miss costs base-core attribution but leaves the
+		// rest of the tracker working, which is what the old scan-at-init path did.
+		uintptr_t queryAddr = scanner->ResolveOptional(
+			self, "UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding", Signatures::GetBaseCoresRangedBuilding);
 		if (!queryAddr)
 		{
-			LOG_WARN("ProductionBaseCore: UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding pattern not found - "
+			LOG_WARN("ProductionBaseCore: UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding unresolved - "
 				"items will report 'Unknown Location'");
 			return false;
 		}
@@ -249,7 +246,8 @@ namespace ProductionBaseCore
 		LOG_DEBUG("ProductionBaseCore: GetBaseCoresRangedBuilding pattern matched at 0x%llX",
 			static_cast<unsigned long long>(queryAddr));
 
-		uintptr_t ctorAddr = scanner->FindPatternInMainModule(Signatures::BaseCoreReplicationHelperCtor);
+		uintptr_t ctorAddr = scanner->ResolveOptional(
+			self, "FCrMassEntityReplicationHelper::FCrMassEntityReplicationHelper", Signatures::BaseCoreReplicationHelperCtor);
 		if (ctorAddr)
 		{
 			g_replicationHelperCtor = reinterpret_cast<ReplicationHelperCtorFn>(ctorAddr);
@@ -257,10 +255,11 @@ namespace ProductionBaseCore
 				static_cast<unsigned long long>(ctorAddr));
 		}
 		else
-			LOG_WARN("ProductionBaseCore: FCrMassEntityReplicationHelper ctor pattern not found - "
+			LOG_WARN("ProductionBaseCore: FCrMassEntityReplicationHelper ctor unresolved - "
 				"base cores will show as '%s'", kUnnamedBase);
 
-		uintptr_t nameAddr = scanner->FindPatternInMainModule(Signatures::GetBuildingCustomNameByReplicationHelper);
+		uintptr_t nameAddr = scanner->ResolveOptional(
+			self, "UCrBuildingCustomNameSubsystem::GetBuildingCustomNameByReplicationHelper", Signatures::GetBuildingCustomNameByReplicationHelper);
 		if (nameAddr)
 		{
 			g_getNameByReplicationHelper = reinterpret_cast<GetNameByReplicationHelperFn>(nameAddr);
@@ -268,7 +267,7 @@ namespace ProductionBaseCore
 				static_cast<unsigned long long>(nameAddr));
 		}
 		else
-			LOG_WARN("ProductionBaseCore: GetBuildingCustomNameByReplicationHelper pattern not found - "
+			LOG_WARN("ProductionBaseCore: GetBuildingCustomNameByReplicationHelper unresolved - "
 				"base cores will show as '%s'", kUnnamedBase);
 
 		LOG_INFO("ProductionBaseCore: base core resolution ready (names %s)",

@@ -44,7 +44,10 @@ namespace ProductionBaseCore
 	// false (and logs a warning) if the containment query pattern could not be
 	// resolved; in that case every lookup returns empty and items report
 	// "Unknown Location", but nothing else breaks.
-	bool Init(IPluginSelf* self);
+	// Resolves the base core query + custom-name functions. Callable only from
+	// the plugin's OnPluginLoadHooks export -- the loader refuses scans made
+	// anywhere else. Degrades to "Unknown Location" when a pattern misses.
+	bool ResolvePatterns(IPluginSelf* self, IPluginHookScanner* scanner);
 
 	// Clears resolved function pointers and cached data.
 	void Shutdown();

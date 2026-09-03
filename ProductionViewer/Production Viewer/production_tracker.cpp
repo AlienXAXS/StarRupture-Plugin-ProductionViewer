@@ -320,18 +320,24 @@ namespace ProductionTracker
 		}
 	}
 
+	void ResolvePatterns(IPluginSelf* self, IPluginHookScanner* scanner)
+	{
+		// Resolves the base core containment query + custom-name functions used
+		// to attribute craft completions to a base. Degrades to "Unknown
+		// Location" if its patterns don't match.
+		ProductionBaseCore::ResolvePatterns(self, scanner);
+
+		ProductionMass::ResolvePatterns(self, scanner);
+	}
+
 	void Init(IPluginSelf* self)
 	{
 		if (self->hooks->Engine)
 			self->hooks->Engine->RegisterOnTick(&OnEngineTick);
 
-		// Resolves the base core containment query + custom-name functions used
-		// to attribute craft completions to a base. Degrades to "Unknown
-		// Location" if its patterns don't match.
-		ProductionBaseCore::Init(self);
-
 		// Catches crafting completions for Mass-simulated (de-spawned) factories,
-		// which the actor-only hook above can't see.
+		// which the actor-only hook above can't see. Its addresses (and the base
+		// core ones) were resolved back in OnPluginLoadHooks; see ResolvePatterns.
 		ProductionMass::Init(self, &OnMassCraftingComplete);
 
 		LOG_INFO("ProductionTracker: initialized");

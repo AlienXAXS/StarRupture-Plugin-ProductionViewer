@@ -33,6 +33,10 @@ namespace ProductionTracker
 {
 	// Registers the crafting-finished hook and engine tick. Call once during
 	// PluginInit.
+	// Resolves every AOB the tracker's submodules need. Callable only from the
+	// plugin's OnPluginLoadHooks export -- the loader refuses scans elsewhere.
+	void ResolvePatterns(IPluginSelf* self, IPluginHookScanner* scanner);
+
 	void Init(IPluginSelf* self);
 
 	// Unregisters hooks and flushes any pending data to disk.
