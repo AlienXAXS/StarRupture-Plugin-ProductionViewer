@@ -74,7 +74,7 @@ namespace Signatures
 	// Builds the NetID + persistent-ID helper the custom-name subsystem keys on.
 	// Ported from BetterMap's basecore_rename.h (same modloader/game pairing).
 	inline constexpr const char* BaseCoreReplicationHelperCtor =
-		"48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 33 ED C7 41 ?? ?? ?? ?? ?? ?? ?? 48 8B F1";
+		"48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 33 ED C7 41 ?? ?? ?? ?? ?? ?? ?? 48 8B F9";
 
 	// UCrBuildingCustomNameSubsystem::GetBuildingCustomNameByReplicationHelper(
 	//     FString* result, FCrMassEntityReplicationHelper*, bool* outIsDefaultName)
