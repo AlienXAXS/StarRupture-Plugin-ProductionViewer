@@ -121,8 +121,13 @@ namespace ProductionMass
 		// UWorld::GetSubsystem<UMassEntitySubsystem>()
 		bool ResolveGetMassEntitySubsystem(IPluginSelf* self, IPluginHookScanner* scanner)
 		{
-			uintptr_t addr = scanner->ResolveOptional(
-				self, "UWorld::GetSubsystem<UMassEntitySubsystem>", Signatures::GetMassEntitySubsystem);
+			PluginScanRequest req = PLUGIN_SCAN_REQUEST_INIT;
+			req.hookName = "UWorld::GetSubsystem<UMassEntitySubsystem>";
+			req.pattern  = Signatures::GetMassEntitySubsystem;
+			req.kind     = PLUGIN_SCAN_FUNCTION_START;   // called with a UWorld* in RCX
+			req.flags    = PLUGIN_SCAN_FLAG_OPTIONAL;
+
+			uintptr_t addr = scanner->Resolve(self, &req);
 			if (!addr)
 			{
 				LOG_WARN("ProductionMass: UWorld::GetSubsystem<UMassEntitySubsystem> unresolved");
@@ -208,34 +213,43 @@ namespace ProductionMass
 				return false;
 			}
 
-			uintptr_t addr = scanner->ResolveOptional(
-				self, "GetMassFragment<FCrCraftingFragment>", Signatures::GetMassFragment_FCrCraftingFragment);
-			if (!addr)
+			// This AOB deliberately matches a CALL SITE rather than the callee:
+			// GetMassFragment<T> is a template body that several instantiations
+			// share byte for byte, so the site is unique where the function is
+			// not. The loader decodes the rel32 itself (FOLLOW_REL32) -- it
+			// checks the opcode really is E8/E9 and that the target lands inside
+			// the image, which is what this call site's hand-rolled follow used
+			// to do -- and then applies the kind check to the TARGET. So
+			// uniqueness is judged on the call site and FUNCTION_START on the
+			// function it names, which is the combination that makes this
+			// pattern shape safe.
+			PluginScanRequest req = PLUGIN_SCAN_REQUEST_INIT;
+			req.hookName = "GetMassFragment<FCrCraftingFragment>";
+			req.pattern  = Signatures::GetMassFragment_FCrCraftingFragment;
+			req.kind     = PLUGIN_SCAN_FUNCTION_START;
+			req.flags    = PLUGIN_SCAN_FLAG_OPTIONAL;
+
+			if (Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset == ~0ULL)
+			{
+				req.flags        |= PLUGIN_SCAN_FLAG_FOLLOW_REL32;
+				req.followRel32At = 0;   // the E8 is the first byte of the match
+			}
+			else
+			{
+				// The other shape this signature supports: the AOB matches inside
+				// the function and the entry is a fixed distance back.
+				req.resultOffset = static_cast<int32_t>(Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset);
+			}
+
+			const uintptr_t fragmentFn = scanner->Resolve(self, &req);
+			if (!fragmentFn)
 			{
 				LOG_WARN("ProductionMass: GetMassFragment<FCrCraftingFragment> unresolved");
 				return false;
 			}
 
-			uintptr_t fragmentFn;
-			if (Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset == ~0ULL)
-			{
-				// Xref AOB: the match is a call site; follow the E8 rel32 to the entry.
-				fragmentFn = FollowRelCall(addr);
-				if (!fragmentFn)
-				{
-					scanner->ReportWarning(self, "GetMassFragment<FCrCraftingFragment>",
-						"Xref AOB matched but the E8 rel32 call follow failed -- Mass-simulated crafting will not be tracked.");
-					LOG_WARN("ProductionMass: ResolveFragmentAccessors - xref AOB call follow failed");
-					return false;
-				}
-			}
-			else
-			{
-				fragmentFn = addr + Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset;
-			}
-
-			LOG_DEBUG("ProductionMass: ResolveFragmentAccessors - AOB match=0x%llX fragmentFn=0x%llX",
-				static_cast<unsigned long long>(addr), static_cast<unsigned long long>(fragmentFn));
+			LOG_DEBUG("ProductionMass: ResolveFragmentAccessors - fragmentFn=0x%llX",
+				static_cast<unsigned long long>(fragmentFn));
 			LogCodeRange("fragmentFn", reinterpret_cast<void*>(fragmentFn), 0x90);
 
 			uintptr_t staticStructAddr = FollowRelCall(fragmentFn + Signatures::GetMassFragment_StaticStructCallOffset);
@@ -266,8 +280,13 @@ namespace ProductionMass
 		// including CrMassSignals::CraftingItemComplete on craft completion.
 		uintptr_t ResolveSignalEntity(IPluginSelf* self, IPluginHookScanner* scanner)
 		{
-			uintptr_t addr = scanner->ResolveOptional(
-				self, "UMassSignalSubsystem::SignalEntity", Signatures::MassSignalSubsystem_SignalEntity);
+			PluginScanRequest req = PLUGIN_SCAN_REQUEST_INIT;
+			req.hookName = "UMassSignalSubsystem::SignalEntity";
+			req.pattern  = Signatures::MassSignalSubsystem_SignalEntity;
+			req.kind     = PLUGIN_SCAN_FUNCTION_START;   // detoured
+			req.flags    = PLUGIN_SCAN_FLAG_OPTIONAL;
+
+			uintptr_t addr = scanner->Resolve(self, &req);
 			if (!addr)
 				LOG_WARN("ProductionMass: UMassSignalSubsystem::SignalEntity unresolved");
 

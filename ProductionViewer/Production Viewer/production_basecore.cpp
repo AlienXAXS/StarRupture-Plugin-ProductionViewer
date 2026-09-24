@@ -227,6 +227,18 @@ namespace ProductionBaseCore
 		}
 	}
 
+	static uintptr_t ResolveFunction(IPluginSelf* self, IPluginHookScanner* scanner,
+		const char* hookName, const char* pattern)
+	{
+		PluginScanRequest req = PLUGIN_SCAN_REQUEST_INIT;
+		req.hookName = hookName;
+		req.pattern  = pattern;
+		req.kind     = PLUGIN_SCAN_FUNCTION_START;
+		req.flags    = PLUGIN_SCAN_FLAG_OPTIONAL;
+
+		return scanner->Resolve(self, &req);
+	}
+
 	bool ResolvePatterns(IPluginSelf* self, IPluginHookScanner* scanner)
 	{
 		if (!self || !scanner)
@@ -234,8 +246,12 @@ namespace ProductionBaseCore
 
 		// Optional throughout: a miss costs base-core attribution but leaves the
 		// rest of the tracker working, which is what the old scan-at-init path did.
-		uintptr_t queryAddr = scanner->ResolveOptional(
-			self, "UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding", Signatures::GetBaseCoresRangedBuilding);
+		//
+		// All three are called directly with a `this` pointer, so each declares
+		// FUNCTION_START -- calling into an address that merely looked right is
+		// the failure this check exists to stop.
+		uintptr_t queryAddr = ResolveFunction(self, scanner,
+			"UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding", Signatures::GetBaseCoresRangedBuilding);
 		if (!queryAddr)
 		{
 			LOG_WARN("ProductionBaseCore: UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding unresolved - "
@@ -246,8 +262,8 @@ namespace ProductionBaseCore
 		LOG_DEBUG("ProductionBaseCore: GetBaseCoresRangedBuilding pattern matched at 0x%llX",
 			static_cast<unsigned long long>(queryAddr));
 
-		uintptr_t ctorAddr = scanner->ResolveOptional(
-			self, "FCrMassEntityReplicationHelper::FCrMassEntityReplicationHelper", Signatures::BaseCoreReplicationHelperCtor);
+		uintptr_t ctorAddr = ResolveFunction(self, scanner,
+			"FCrMassEntityReplicationHelper::FCrMassEntityReplicationHelper", Signatures::BaseCoreReplicationHelperCtor);
 		if (ctorAddr)
 		{
 			g_replicationHelperCtor = reinterpret_cast<ReplicationHelperCtorFn>(ctorAddr);
@@ -258,8 +274,8 @@ namespace ProductionBaseCore
 			LOG_WARN("ProductionBaseCore: FCrMassEntityReplicationHelper ctor unresolved - "
 				"base cores will show as '%s'", kUnnamedBase);
 
-		uintptr_t nameAddr = scanner->ResolveOptional(
-			self, "UCrBuildingCustomNameSubsystem::GetBuildingCustomNameByReplicationHelper", Signatures::GetBuildingCustomNameByReplicationHelper);
+		uintptr_t nameAddr = ResolveFunction(self, scanner,
+			"UCrBuildingCustomNameSubsystem::GetBuildingCustomNameByReplicationHelper", Signatures::GetBuildingCustomNameByReplicationHelper);
 		if (nameAddr)
 		{
 			g_getNameByReplicationHelper = reinterpret_cast<GetNameByReplicationHelperFn>(nameAddr);
