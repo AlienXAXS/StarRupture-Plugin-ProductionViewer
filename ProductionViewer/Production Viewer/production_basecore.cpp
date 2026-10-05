@@ -230,6 +230,13 @@ namespace ProductionBaseCore
 	static uintptr_t ResolveFunction(IPluginSelf* self, IPluginHookScanner* scanner,
 		const char* hookName, const char* pattern)
 	{
+		// A build with no pattern for this function yet - see plugin_signatures.h.
+		if (!pattern || !*pattern)
+		{
+			LOG_WARN("ProductionBaseCore: no pattern for %s in this build - skipping scan", hookName);
+			return 0;
+		}
+
 		PluginScanRequest req = PLUGIN_SCAN_REQUEST_INIT;
 		req.hookName = hookName;
 		req.pattern  = pattern;

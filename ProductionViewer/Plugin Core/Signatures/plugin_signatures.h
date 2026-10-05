@@ -82,7 +82,18 @@ namespace Signatures
 	// de-spawned/unloaded buildings). outIsDefaultName is set when the subsystem
 	// fell back to the building's default type name (e.g. "Base Core").
 	// Ported from BetterMap's basecore_rename.h.
+	//
+	// The client and dedicated-server binaries compile this function
+	// differently, so each build carries its own pattern. The client one is
+	// still needed: a listen-server host or single-player game runs the client
+	// build and resolves names locally. nullptr = no pattern for that build;
+	// the scan is skipped and base cores show as "Unnamed Base".
+#if defined(MODLOADER_SERVER_BUILD)
+	inline constexpr const char* GetBuildingCustomNameByReplicationHelper =
+		"48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 49 8B F9 49 8B D8 48 8B EA 48 8B F1 E8 ?? ?? ?? ?? ?? ?? ?? 4C 8D 44 24";
+#else
 	inline constexpr const char* GetBuildingCustomNameByReplicationHelper =
 		"48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 49 8B E9 49 8B D8 48 8B FA 48 8B F1 E8 ?? ?? ?? ?? 48 8B C8 E8";
+#endif
 
 }
