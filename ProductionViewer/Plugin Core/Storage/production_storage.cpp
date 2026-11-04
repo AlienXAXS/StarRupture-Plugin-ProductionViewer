@@ -1,5 +1,6 @@
 #include "production_storage.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
+#include "Production Viewer/production_fields.h"
 
 #include "Chimera_classes.hpp"
 #include "Engine_classes.hpp"
@@ -16,10 +17,6 @@ namespace ProductionViewer::Storage
 {
 	namespace
 	{
-		// UCrGameInstance::ServerSessionName — offset within UCrGameInstance,
-		// not exposed by the generated SDK (folded into trailing padding bytes).
-		constexpr std::ptrdiff_t kServerSessionNameOffset = 0x250;
-
 		std::mutex     g_mutex;
 		std::string    g_dataDir;     // <Plugins>\<pluginName>
 		std::string    g_sessionName;
@@ -70,9 +67,12 @@ namespace ProductionViewer::Storage
 		// Must run on the game thread — touches UWorld/UObject state.
 		std::string ResolveSessionName()
 		{
+			if (!ProductionViewerFields::SessionSave.On())
+				return "";
+
 			try
 			{
-				SDK::UWorld* world = SDK::UWorld::GetWorld();
+				SDK::UWorld* world = PluginSdkRuntime::GetWorld();
 				if (!world)
 				{
 					LOG_DEBUG("Storage: ResolveSessionName - no world loaded.");
@@ -88,9 +88,13 @@ namespace ProductionViewer::Storage
 
 				// UCrGameInstance::ServerSessionName — not present in the generated SDK
 				// (folded into the trailing padding bytes), but populated on load even
-				// for single-player sessions. Read directly via its known offset.
-				auto* serverSessionName = reinterpret_cast<SDK::FString*>(
-					reinterpret_cast<std::uint8_t*>(gameInstance) + kServerSessionNameOffset);
+				// for single-player sessions. Its offset comes from the loader's map.
+				const SDK::FString* serverSessionName = ProductionViewerFields::ServerSessionName.In(gameInstance);
+				if (!serverSessionName)
+				{
+					LOG_DEBUG("Storage: ResolveSessionName - ServerSessionName did not resolve.");
+					return "";
+				}
 
 				std::string sessionName = serverSessionName->ToString();
 				LOG_DEBUG("Storage: ResolveSessionName resolved '%s'.", sessionName.c_str());

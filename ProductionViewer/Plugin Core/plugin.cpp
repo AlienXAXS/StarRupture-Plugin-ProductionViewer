@@ -7,6 +7,7 @@
 #include "Production Viewer/production_tracker.h"
 #include "Production Viewer/production_icons.h"
 #include "Production Viewer/production_waypoint.h"
+#include "Production Viewer/production_fields.h"
 #include "Engine_classes.hpp"
 
 // Global plugin self pointer — stable for the plugin's lifetime, retained from PluginInit
@@ -38,14 +39,16 @@ static PluginInfo s_pluginInfo = {
 	"AlienX",
 	"Displays production information",
 	PLUGIN_INTERFACE_VERSION,
-	PLUGIN_TARGET_THIS
+	PLUGIN_TARGET_THIS,
+	PLUGIN_GAME_BUILT_CL,
+	PLUGIN_MAP_MIGRATED
 };
 
 // Fires once a save is fully loaded into the world — (re)load this session's
 // production data so "All Time" totals continue from where they left off.
 static void OnExperienceLoadComplete()
 {
-	SDK::UWorld* world = SDK::UWorld::GetWorld();
+	SDK::UWorld* world = PluginSdkRuntime::GetWorld();
 	if (!world || world->GetName() != "ChimeraMain")
 	{
 		LOG_DEBUG("OnExperienceLoadComplete: ignored (not in ChimeraMain map)");
@@ -74,11 +77,17 @@ extern "C" {
 	__declspec(dllexport) void OnPluginLoadHooks(IPluginSelf* self, IPluginHookScanner* scanner)
 	{
 		g_self = self;
+		ProductionViewerFields::DeclareFeatures(self, scanner);
+		ProductionViewerFields::Resolve(self, scanner);
 		ProductionTracker::ResolvePatterns(self, scanner);
 	}
 
 	__declspec(dllexport) bool PluginInit(IPluginSelf* self)
 	{
+		// First, before any early return: off its game build the loader refuses a
+		// plugin whose PluginInit did not take the globals.
+		PluginSdkRuntime::Init(self->hooks);
+
 		// Store the plugin self pointer — valid for the plugin's entire lifetime
 		g_self = self;
 

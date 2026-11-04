@@ -1,5 +1,6 @@
 #include "production_icons.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
+#include "production_fields.h"
 
 #include "Chimera_classes.hpp"
 #include "AuItems_classes.hpp"
@@ -104,7 +105,8 @@ namespace ProductionIcons
 		// storage.
 		SDK::UTexture2D* GetItemIconResource(SDK::UAuItemDataBase* item)
 		{
-			return item ? reinterpret_cast<SDK::UTexture2D*>(item->ItemIcon.ResourceObject) : nullptr;
+			const SDK::FSlateBrush* icon = ProductionViewerFields::ItemIcon.In(item);
+			return icon ? reinterpret_cast<SDK::UTexture2D*>(icon->ResourceObject) : nullptr;
 		}
 
 		// Every item type is defined as a Blueprint (UAuItemBlueprint asset whose
@@ -295,7 +297,8 @@ namespace ProductionIcons
 						if (!item)
 							continue;
 
-						const std::string uniqueName = item->UniqueItemName.ToString();
+						const SDK::FName* uniqueItemName = ProductionViewerFields::ItemUniqueName.In(item);
+						const std::string uniqueName = uniqueItemName ? uniqueItemName->ToString() : std::string();
 						if (uniqueName.empty())
 							continue;
 
@@ -383,6 +386,12 @@ namespace ProductionIcons
 
 	void Init(IPluginSelf* self)
 	{
+		if (!ProductionViewerFields::ItemIcons.On())
+		{
+			LOG_WARN("ProductionIcons: item icons are off - the game update moved something they need");
+			return;
+		}
+
 		IPluginSplash* splash = (self && self->hooks) ? self->hooks->Splash : nullptr;
 		if (splash && splash->IsVisible())
 			splash->AcquireSplashHold();

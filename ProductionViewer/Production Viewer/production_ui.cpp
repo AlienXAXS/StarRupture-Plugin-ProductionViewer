@@ -7,6 +7,7 @@
 #include "Plugin Core/Net/production_net.h"
 
 #include "Engine_classes.hpp"
+#include "plugin_map.h"
 
 #include <algorithm>
 #include <array>
@@ -649,7 +650,7 @@ namespace ProductionUI
 			}
 			else
 			{
-				SDK::UWorld* world = SDK::UWorld::GetWorld();
+				SDK::UWorld* world = PluginSdkRuntime::GetWorld();
 				if (!world || world->GetName() != "ChimeraMain")
 				{
 					LOG_DEBUG("ProductionUI: OnToggleKey ignored (not in ChimeraMain map)");

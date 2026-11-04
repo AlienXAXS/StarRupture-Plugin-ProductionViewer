@@ -6,6 +6,8 @@
 #include "CoreUObject_classes.hpp"
 #include "Chimera_structs.hpp"
 #include "MassSignals_classes.hpp"
+#include "plugin_map.h"
+#include "production_fields.h"
 
 #include <windows.h>
 #include <cstdio>
@@ -112,22 +114,18 @@ namespace ProductionMass
 			if (!subsystem)
 				return nullptr;
 
-			// UMassEntitySubsystem::EntityManager (TSharedPtr<FMassEntityManager>) at
-			// offset 0x38 - .Object is the raw FMassEntityManager* (MassEntity_classes.hpp,
-			// Pad_38[0x10]).
-			return *reinterpret_cast<void**>(reinterpret_cast<uint8_t*>(subsystem) + 0x38);
+			// UMassEntitySubsystem::EntityManager is a TSharedPtr<FMassEntityManager>;
+			// the raw FMassEntityManager* is its .Object. Null when the loader has no
+			// row for the member on this build.
+			return PluginMap::MassEntityManagerOf(subsystem);
 		}
 
 		// UWorld::GetSubsystem<UMassEntitySubsystem>()
 		bool ResolveGetMassEntitySubsystem(IPluginSelf* self, IPluginHookScanner* scanner)
 		{
-			PluginScanRequest req = PLUGIN_SCAN_REQUEST_INIT;
-			req.hookName = "UWorld::GetSubsystem<UMassEntitySubsystem>";
-			req.pattern  = Signatures::GetMassEntitySubsystem;
-			req.kind     = PLUGIN_SCAN_FUNCTION_START;   // called with a UWorld* in RCX
-			req.flags    = PLUGIN_SCAN_FLAG_OPTIONAL;
-
-			uintptr_t addr = scanner->Resolve(self, &req);
+			// FUNCTION_START: called with a UWorld* in RCX.
+			uintptr_t addr = PluginMap::Function(scanner, self, "UWorld::GetSubsystem<UMassEntitySubsystem>",
+				Signatures::GetMassEntitySubsystem, PLUGIN_SCAN_FUNCTION_START, PLUGIN_SCAN_FLAG_OPTIONAL);
 			if (!addr)
 			{
 				LOG_WARN("ProductionMass: UWorld::GetSubsystem<UMassEntitySubsystem> unresolved");
@@ -154,7 +152,7 @@ namespace ProductionMass
 			LOG_DEBUG("ProductionMass: SignalEntity - CraftingItemComplete for entity Index=%u SerialNumber=%u",
 				entity.Index, entity.SerialNumber);
 
-			SDK::UWorld* world = *reinterpret_cast<SDK::UWorld**>(reinterpret_cast<uint8_t*>(self) + 0xB0);
+			SDK::UWorld* world = PluginMap::MassSignalWorldOf(self);
 			if (!world)
 			{
 				LOG_DEBUG("ProductionMass: SignalEntity - CachedWorld is null, ignoring");
@@ -175,23 +173,6 @@ namespace ProductionMass
 
 			auto* fragment = static_cast<const SDK::FCrCraftingFragment*>(g_getFragmentDataPtr(entityManager, entity, fragmentType));
 			LOG_DEBUG("ProductionMass: SignalEntity - fragment=%p", fragment);
-
-			if (fragment)
-			{
-				const auto* bytes = reinterpret_cast<const uint8_t*>(fragment);
-				char hex[3 * 0x20 + 1] = {};
-				for (int i = 0; i < 0x20; ++i)
-					std::snprintf(hex + i * 3, 4, "%02X ", bytes[i]);
-				LOG_DEBUG("ProductionMass: SignalEntity - fragment[0x00-0x1F]: %s", hex);
-
-				for (int i = 0; i < 0x20; ++i)
-					std::snprintf(hex + i * 3, 4, "%02X ", bytes[0x20 + i]);
-				LOG_DEBUG("ProductionMass: SignalEntity - fragment[0x20-0x3F]: %s", hex);
-
-				for (int i = 0; i < 0x20; ++i)
-					std::snprintf(hex + i * 3, 4, "%02X ", bytes[0x60 + i]);
-				LOG_DEBUG("ProductionMass: SignalEntity - fragment[0x60-0x7F]: %s", hex);
-			}
 
 			if (fragment)
 				g_callback(fragment, world, entity);
@@ -223,25 +204,24 @@ namespace ProductionMass
 			// uniqueness is judged on the call site and FUNCTION_START on the
 			// function it names, which is the combination that makes this
 			// pattern shape safe.
-			PluginScanRequest req = PLUGIN_SCAN_REQUEST_INIT;
-			req.hookName = "GetMassFragment<FCrCraftingFragment>";
-			req.pattern  = Signatures::GetMassFragment_FCrCraftingFragment;
-			req.kind     = PLUGIN_SCAN_FUNCTION_START;
-			req.flags    = PLUGIN_SCAN_FLAG_OPTIONAL;
+			uint32_t flags         = PLUGIN_SCAN_FLAG_OPTIONAL;
+			int32_t  resultOffset  = 0;
+			int32_t  followRel32At = 0;   // the E8 is the first byte of the match
 
 			if (Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset == ~0ULL)
 			{
-				req.flags        |= PLUGIN_SCAN_FLAG_FOLLOW_REL32;
-				req.followRel32At = 0;   // the E8 is the first byte of the match
+				flags |= PLUGIN_SCAN_FLAG_FOLLOW_REL32;
 			}
 			else
 			{
 				// The other shape this signature supports: the AOB matches inside
 				// the function and the entry is a fixed distance back.
-				req.resultOffset = static_cast<int32_t>(Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset);
+				resultOffset = static_cast<int32_t>(Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset);
 			}
 
-			const uintptr_t fragmentFn = scanner->Resolve(self, &req);
+			const uintptr_t fragmentFn = PluginMap::Function(scanner, self, "GetMassFragment<FCrCraftingFragment>",
+				Signatures::GetMassFragment_FCrCraftingFragment, PLUGIN_SCAN_FUNCTION_START, flags,
+				resultOffset, followRel32At);
 			if (!fragmentFn)
 			{
 				LOG_WARN("ProductionMass: GetMassFragment<FCrCraftingFragment> unresolved");
@@ -280,13 +260,9 @@ namespace ProductionMass
 		// including CrMassSignals::CraftingItemComplete on craft completion.
 		uintptr_t ResolveSignalEntity(IPluginSelf* self, IPluginHookScanner* scanner)
 		{
-			PluginScanRequest req = PLUGIN_SCAN_REQUEST_INIT;
-			req.hookName = "UMassSignalSubsystem::SignalEntity";
-			req.pattern  = Signatures::MassSignalSubsystem_SignalEntity;
-			req.kind     = PLUGIN_SCAN_FUNCTION_START;   // detoured
-			req.flags    = PLUGIN_SCAN_FLAG_OPTIONAL;
-
-			uintptr_t addr = scanner->Resolve(self, &req);
+			// FUNCTION_START: detoured.
+			uintptr_t addr = PluginMap::Function(scanner, self, "UMassSignalSubsystem::SignalEntity",
+				Signatures::MassSignalSubsystem_SignalEntity, PLUGIN_SCAN_FUNCTION_START, PLUGIN_SCAN_FLAG_OPTIONAL);
 			if (!addr)
 				LOG_WARN("ProductionMass: UMassSignalSubsystem::SignalEntity unresolved");
 
@@ -333,8 +309,7 @@ namespace ProductionMass
 				static_cast<void*>(s_transformFragmentStruct), s_transformFragmentStruct->GetFullName().c_str());
 		}
 
-		const auto* fragment = static_cast<const uint8_t*>(
-			g_getFragmentDataPtr(entityManager, entity, s_transformFragmentStruct));
+		const void* fragment = g_getFragmentDataPtr(entityManager, entity, s_transformFragmentStruct);
 		if (!fragment)
 		{
 			LOG_DEBUG("ProductionMass: GetEntityLocation - entity Index=%u Serial=%u has no FTransformFragment",
@@ -342,9 +317,15 @@ namespace ProductionMass
 			return false;
 		}
 
-		// FTransformFragment { FTransform Transform; } - Translation (FVector,
-		// 3 doubles) sits at +0x20 within FTransform (after the 0x20 FQuat).
-		std::memcpy(&outLocation, fragment + 0x20, sizeof(SDK::FVector));
+		const SDK::FVector* translation = ProductionViewerFields::TransformTranslation.In(
+			ProductionViewerFields::TransformFragmentTransform.In(fragment));
+		if (!translation)
+		{
+			LOG_DEBUG("ProductionMass: GetEntityLocation - transform members unresolved on this build");
+			return false;
+		}
+
+		outLocation = *translation;
 		return true;
 	}
 
@@ -367,6 +348,12 @@ namespace ProductionMass
 
 	bool Init(IPluginSelf* self, CraftingCompleteCallback callback)
 	{
+		if (!ProductionViewerFields::Tracking.On())
+		{
+			LOG_WARN("ProductionMass: crafting counts are off - the game update moved something they need");
+			return false;
+		}
+
 		if (!self->hooks->Hooks)
 		{
 			LOG_WARN("ProductionMass: hooks unavailable - Mass-simulated crafting will not be tracked");

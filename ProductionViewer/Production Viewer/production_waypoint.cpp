@@ -3,6 +3,7 @@
 #include "Plugin Core/Helpers/plugin_helpers.h"
 
 #include "Engine_classes.hpp"
+#include "plugin_map.h"
 
 #include <cmath>
 #include <mutex>
@@ -30,6 +31,13 @@ namespace ProductionWaypoint
 		bool g_active = false;
 		uint64_t g_targetKey = 0;
 		std::string g_targetName;
+
+		// The local player's pose, sampled by Tick() on the game thread. The
+		// render callback runs on the render thread, where UObjects must not
+		// be touched, so it only reads this copy.
+		bool g_poseValid = false;
+		SDK::FVector g_playerLoc{};
+		double g_playerYaw = 0.0;
 
 		// Draws an isoceles arrow centered in a kArrowAreaSize square reserved
 		// at the current layout cursor, pointing at relativeDegrees (0 =
@@ -76,12 +84,18 @@ namespace ProductionWaypoint
 		{
 			uint64_t targetKey;
 			std::string targetName;
+			bool poseValid;
+			SDK::FVector playerLoc;
+			double playerYaw;
 			{
 				std::lock_guard<std::mutex> lock(g_mutex);
 				if (!g_active)
 					return;
 				targetKey = g_targetKey;
 				targetName = g_targetName;
+				poseValid = g_poseValid;
+				playerLoc = g_playerLoc;
+				playerYaw = g_playerYaw;
 			}
 
 			imgui->SetWindowFontScale(1.15f);
@@ -98,12 +112,10 @@ namespace ProductionWaypoint
 
 			imgui->Separator();
 
-			SDK::UWorld* world = SDK::UWorld::GetWorld();
-			SDK::APawn* pawn = world ? SDK::UGameplayStatics::GetPlayerPawn(world, 0) : nullptr;
-			if (!pawn)
+			if (!poseValid)
 			{
 				imgui->TextDisabled("Player unavailable.");
-				LOG_TRACE("ProductionWaypoint: render - no player pawn (world=%p)", static_cast<void*>(world));
+				LOG_TRACE("ProductionWaypoint: render - no player pose yet");
 				return;
 			}
 
@@ -116,9 +128,6 @@ namespace ProductionWaypoint
 				ClearTarget();
 				return;
 			}
-
-			const SDK::FVector playerLoc = pawn->K2_GetActorLocation();
-			const double playerYaw = pawn->GetControlRotation().Yaw;
 
 			const double dx = targetLoc.X - playerLoc.X;
 			const double dy = targetLoc.Y - playerLoc.Y;
@@ -194,6 +203,33 @@ namespace ProductionWaypoint
 		std::lock_guard<std::mutex> lock(g_mutex);
 		g_active = false;
 		g_self = nullptr;
+	}
+
+	void Tick()
+	{
+		{
+			std::lock_guard<std::mutex> lock(g_mutex);
+			if (!g_active)
+				return;
+		}
+
+		SDK::UWorld* world = PluginSdkRuntime::GetWorld();
+		SDK::APawn* pawn = world ? SDK::UGameplayStatics::GetPlayerPawn(world, 0) : nullptr;
+
+		bool valid = false;
+		SDK::FVector loc{};
+		double yaw = 0.0;
+		if (pawn)
+		{
+			loc = pawn->K2_GetActorLocation();
+			yaw = pawn->GetControlRotation().Yaw;
+			valid = true;
+		}
+
+		std::lock_guard<std::mutex> lock(g_mutex);
+		g_poseValid = valid;
+		g_playerLoc = loc;
+		g_playerYaw = yaw;
 	}
 
 	void SetTarget(uint64_t baseKey, const std::string& baseName)

@@ -177,6 +177,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Plugin Core\plugin.h" />
+    <ClInclude Include="Production Viewer\production_fields.h" />
     <ClInclude Include="Plugin Core\Config\plugin_config.h" />
     <ClInclude Include="Plugin Core\Helpers\plugin_helpers.h" />
     <ClInclude Include="Plugin Core\Net\production_net.h" />
