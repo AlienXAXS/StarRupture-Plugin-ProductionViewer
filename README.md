@@ -106,6 +106,10 @@ to "waiting for the server".
 
 See [PluginDevelopment.md](PluginDevelopment.md) for the full plugin API reference.
 
+## Reporting Bugs
+
+Found a bug? [Report it on GitHub](https://github.com/AlienXAXS/StarRupture-Plugin-ProductionViewer/issues) and attach your `ModLoader.log` (in `<game>\StarRupture\Binaries\Win64\ModLoader\Logs\`).
+
 ## Credits
 
 Original mod by [@AlienXAXS](https://github.com/AlienXAXS).
