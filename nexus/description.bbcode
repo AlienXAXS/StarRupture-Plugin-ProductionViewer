@@ -1,0 +1,92 @@
+[size=6][b]ProductionViewer [/b][/size]
+[size=6][b]A Factory Production Dashboard for StarRupture[/b][/size]
+
+[b]Found a bug? Report it on GitHub: [url=https://github.com/AlienXAXS/StarRupture-Plugin-ProductionViewer/issues]https://github.com/AlienXAXS/StarRupture-Plugin-ProductionViewer/issues[/url][/b] and attach your [b]ModLoader.log[/b] (in [b]Binaries\Win64\ModLoader\Logs\[/b]).
+
+Track everything your factories produce and consume with a live, searchable production dashboard.
+
+[b]Client-side only[/b]
+
+[line]
+
+[size=5][b]What It Does[/b][/size]
+
+ProductionViewer adds a dedicated production statistics window that tracks item production and consumption across your entire factory network.
+
+Open the dashboard at any time using the configured hotkey (default: [b]P[/b]) to view detailed production metrics, trends, and historical data.
+
+[line]
+
+[size=5][b]Features[/b][/size]
+
+[list]
+[*]Separate Production and Consumption views[/*]
+[*]Live graphs showing production rates over time[/*]
+[*]One graph line per item, scaled for easy comparison[/*]
+[*]Search and filter items by name[/*]
+[*]Hover items to highlight them on the graph[/*]
+[*]Per-item totals and production rates per minute[/*]
+[*]Built-in item icons for easier identification[/*]
+[/list]
+[b]Time Ranges[/b]
+
+[list]
+[*]5 Seconds[/*]
+[*]1 Minute[/*]
+[*]10 Minutes[/*]
+[*]1 Hour[/*]
+[*]All Time[/*]
+[/list]
+[b]Factory Coverage
+
+Production is tracked from both nearby factories and distant mass-simulated factories, allowing accurate statistics across your entire base.
+[/b]
+[line]
+[b]
+[size=5][b]Persistence[/b][/size]
+
+All Time statistics are automatically saved and restored when loading a save game.
+
+This allows long-term production totals to persist between play sessions.
+
+Short-term history windows (5s, 1m, 10m, and 1h) are intentionally reset each time the game starts.
+[/b]
+[line]
+[b]
+[size=5][b]Installation[/b][/size]
+[/b]
+[list=1]
+[*][b]Download the latest file from the [b]Files[/b] tab[/b][/*]
+[*][b]Open the ZIP file[/b][/*]
+[*][b]Copy the contents of the included Plugins folder into:
+[i]"StarRupture\Binaries\Win64\ ModLoader\ Plugins"[/i][/b][/*]
+[*][b]Launch the game[/b][/*]
+[*][b]Press [b]P[/b] (default) to open the Production Viewer[/b][/*]
+[/list]
+[line]
+[b]
+[size=5][b]Configuration[/b][/size]
+
+Config file:
+[i]"Plugins\config\ProductionViewer.ini"[/i]
+[/b]
+[list]
+[*][b]Enabled — enable or disable the plugin[/b][/*]
+[*][b]ToggleKey — key used to open and close the dashboard (default: P)[/b][/*]
+[/list][b]
+The hotkey can also be changed through the ModLoader keybind settings.
+[/b]
+[line]
+[b]
+[size=5][b]Troubleshooting[/b][/size]
+[/b]
+[list]
+[*][b][b]Dashboard does not appear[/b] — ensure the plugin is enabled and press the configured hotkey[/b][/*]
+[*][b][b]No production data visible[/b] — allow the game to run for a short period so statistics can be collected[/b][/*]
+[*][b][b]Plugin not loading[/b] — check [i]"modloader.log in Binaries\Win64"[/i][/b][/*]
+[/list]
+[line]
+[b]
+[size=5][b]Disclaimer[/b][/size]
+
+Use at your own risk. The authors are not responsible for any damage caused by using this software.[/b]
