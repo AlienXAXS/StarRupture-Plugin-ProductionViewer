@@ -5,6 +5,8 @@ factories produce and consume, and shows it in a live, searchable dashboard.
 
 **Target:** Game client, plus a headless server build that feeds connected clients
 
+**Requires:** [StarRupture-ModLoader](https://github.com/AlienXAXS/StarRupture-ModLoader) v1.23.0 or later
+
 ---
 
 ## What It Does
