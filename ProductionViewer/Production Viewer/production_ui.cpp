@@ -650,8 +650,9 @@ namespace ProductionUI
 			}
 			else
 			{
-				SDK::UWorld* world = PluginSdkRuntime::GetWorld();
-				if (!world || world->GetName() != "ChimeraMain")
+				// One atomic read of the loader's UI state, no UObject access.
+				IPluginGameMenu* menu = g_self->hooks->GameMenu;
+				if (!menu || !(menu->GetUIState() & PLUGIN_UI_IN_GAMEPLAY))
 				{
 					LOG_DEBUG("ProductionUI: OnToggleKey ignored (not in ChimeraMain map)");
 					return;
