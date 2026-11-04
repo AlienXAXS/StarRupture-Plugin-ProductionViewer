@@ -103,3 +103,9 @@ plugin version, or the packet schema check drops the feed and clients fall back
 to "waiting for the server".
 
 See [PluginDevelopment.md](PluginDevelopment.md) for the full plugin API reference.
+
+## Credits
+
+Original mod by [@AlienXAXS](https://github.com/AlienXAXS).
+
+Maintained by [@msantoro12](https://github.com/msantoro12).
