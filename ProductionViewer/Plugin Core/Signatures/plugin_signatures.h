@@ -23,26 +23,26 @@ namespace Signatures
 
 	// ---- ProductionMass (production_mass.cpp) ----
 
-	// UCrMassActorComponent::GetMassFragment<FCrCraftingFragment> - xref AOB.
-	// Matches a call site that calls GetMassFragment<FCrCraftingFragment>; the
-	// E8 rel32 at offset 0 is followed at runtime to reach the function entry.
-	// GetMassFragment_FCrCraftingFragment_EntryOffset is set to the sentinel
-	// value ~0 to signal that the match address is a call site, not the entry.
-	inline constexpr const char* GetMassFragment_FCrCraftingFragment =
-		"E8 ?? ?? ?? ?? 48 85 C0 75 ?? 33 C0 48 8B 5C 24 ?? 48 83 C4 ?? 5F C3 "
-		"?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 83 EC";
+	// FCrCraftingFragment::StaticStruct() - the UScriptStruct that keys the
+	// Mass fragment lookup. A function cannot be told from the other fragments'
+	// StaticStruct getters by its own bytes, so this matches a call site: code
+	// that reads the entity manager off a UMassEntitySubsystem (the 48 8B 7F 38
+	// load), passes FCrCraftingFragment::StaticStruct() on to
+	// InternalGetFragmentDataPtr, and is unique in the image. The loader follows
+	// the E8 rel32 at CraftingFragmentStaticStructFollowAt to the getter.
+	inline constexpr const char* CraftingFragmentStaticStruct =
+		"48 8B 7F 38 E8 ?? ?? ?? ?? 48 8B 55 67 4C 8B C0 48 8B CF E8 ?? ?? ?? ??";
+	inline constexpr int32_t CraftingFragmentStaticStructFollowAt = 4;
 
-	// Sentinel: the AOB matches a call site. ResolveFragmentAccessors follows
-	// the E8 rel32 at the match address to get the actual function entry.
-	inline constexpr uintptr_t GetMassFragment_FCrCraftingFragment_EntryOffset = ~0ULL;
-
-	// Offsets of the `call`/`jmp rel32` instructions inside
-	// GetMassFragment<FCrCraftingFragment> (relative to its entry point, i.e.
-	// addr + GetMassFragment_FCrCraftingFragment_EntryOffset) that are
-	// followed to resolve FCrCraftingFragment::StaticStruct (call at +0x55)
-	// and FMassEntityManager::InternalGetFragmentDataPtr (tail-jmp at +0x6D).
-	inline constexpr uintptr_t GetMassFragment_StaticStructCallOffset       = 0x55;
-	inline constexpr uintptr_t GetMassFragment_GetFragmentDataPtrCallOffset = 0x6D;
+	// FMassEntityManager::InternalGetFragmentDataPtr(manager, entity, type) -
+	// returns a pointer to one entity's fragment of the given type. The same
+	// call-site pattern WAILA uses: the AOB matches the call that fetches a
+	// fragment (the first E8, a StaticStruct getter) and the call after it is
+	// the function, so the rel32 at GetFragmentDataPtrFollowAt is followed.
+	inline constexpr const char* GetFragmentDataPtr =
+		"E8 ?? ?? ?? ?? 4C 8B C0 48 8B D3 48 8B CE E8 ?? ?? ?? ?? 48 85 C0 0F 84 ?? ?? ?? ?? "
+		"0F 10 48 20 66 41 0F 2F 4D 30 0F 10 40 30 0F 11 4D EF F2 0F 11 45 FF";
+	inline constexpr int32_t GetFragmentDataPtrFollowAt = 0x0E;
 
 	// UMassSignalSubsystem::SignalEntity(UMassSignalSubsystem*, FName, FMassEntityHandle)
 	// Called for every Mass entity (loaded or simulated) whenever a signal fires,
