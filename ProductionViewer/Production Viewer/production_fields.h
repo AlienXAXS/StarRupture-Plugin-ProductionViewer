@@ -96,14 +96,16 @@ namespace ProductionViewerFields
 	// read an entity's location through the same subsystem and fragment
 	// accessors as tracking. The viewer window and the network stay core.
 	inline PluginMap::Feature Tracking{ "tracking", "Counting what factories craft",
-		KeysOf("UWorld::GetSubsystem<UMassEntitySubsystem>", "GetMassFragment<FCrCraftingFragment>",
+		KeysOf("UWorld::GetSubsystem<UMassEntitySubsystem>", "FCrCraftingFragment::StaticStruct",
+			"FMassEntityManager::InternalGetFragmentDataPtr",
 			"UMassSignalSubsystem::SignalEntity",
 			CraftingSelectedRecipe, CraftingCurrentRecipe, CraftingMultiplier,
 			ItemUniqueName, ItemName, ItemStackData, ItemStackCount, ItemStackSize,
 			PluginMap::MassEntityManagerField, PluginMap::MassSignalWorldField()), {} };
 	inline PluginMap::Feature BaseCores{ "basecores", "Splitting production by base",
 		KeysOf("UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding",
-			"UWorld::GetSubsystem<UMassEntitySubsystem>", "GetMassFragment<FCrCraftingFragment>",
+			"UWorld::GetSubsystem<UMassEntitySubsystem>", "FCrCraftingFragment::StaticStruct",
+			"FMassEntityManager::InternalGetFragmentDataPtr",
 			"FCrMassEntityReplicationHelper::FCrMassEntityReplicationHelper",
 			"UCrBuildingCustomNameSubsystem::GetBuildingCustomNameByReplicationHelper",
 			ReplicationHelperSize, GridEntityHandle, GridEntityData, GridEntityHandleSize,

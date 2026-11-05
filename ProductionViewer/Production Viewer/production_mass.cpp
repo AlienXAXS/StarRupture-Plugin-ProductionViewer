@@ -9,9 +9,7 @@
 #include "plugin_map.h"
 #include "production_fields.h"
 
-#include <windows.h>
 #include <cstdio>
-#include <cstring>
 #include <string>
 
 namespace ProductionMass
@@ -31,44 +29,7 @@ namespace ProductionMass
 		HookHandle           g_signalEntityHook = nullptr;
 		CraftingCompleteCallback g_callback = nullptr;
 
-		// Reads the 32-bit displacement of a `call`/`jmp rel32` instruction
-		// (opcode E8/E9, 5 bytes total) at `instrAddr` and returns its target.
-		uintptr_t FollowRelCall(uintptr_t instrAddr)
-		{
-			int32_t rel = 0;
-			std::memcpy(&rel, reinterpret_cast<const void*>(instrAddr + 1), sizeof(rel));
-			return instrAddr + 5 + static_cast<uintptr_t>(rel);
-		}
-
-		// Returns the [base, base+size) address range of the main module, or
-		// {0, 0} if it can't be determined.
-		void GetMainModuleRange(uintptr_t& base, uintptr_t& size)
-		{
-			HMODULE mod = GetModuleHandle(nullptr);
-			base = reinterpret_cast<uintptr_t>(mod);
-			size = 0;
-			if (!mod)
-				return;
-
-			const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(mod);
-			const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(reinterpret_cast<const uint8_t*>(mod) + dos->e_lfanew);
-			size = nt->OptionalHeader.SizeOfImage;
-		}
-
-		// Sanity check used before treating a FollowRelCall result as a callable
-		// function pointer - guards against AOB/offset drift sending us into a
-		// garbage address (which can corrupt the stack and hard-crash the game
-		// rather than cleanly access-violate).
-		bool LooksLikeCodePointer(const void* ptr)
-		{
-			uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
-			uintptr_t base = 0, size = 0;
-			GetMainModuleRange(base, size);
-			return base != 0 && addr >= base && addr < base + size;
-		}
-
-		// Logs the first 16 bytes at `ptr` for offset-tuning diagnostics. Only
-		// call this after LooksLikeCodePointer(ptr) has returned true.
+		// Logs the first 16 bytes at `ptr`, a function address the loader resolved.
 		void LogCodeBytes(const char* label, const void* ptr)
 		{
 			if (!ptr)
@@ -82,28 +43,6 @@ namespace ProductionMass
 			for (int i = 0; i < 16; ++i)
 				std::snprintf(hex + i * 3, 4, "%02X ", bytes[i]);
 			LOG_DEBUG("ProductionMass: %s = %p [%s]", label, ptr, hex);
-		}
-
-		// Logs `length` bytes starting at `ptr` in 16-byte rows, each prefixed
-		// with its offset from `ptr`. Diagnostic-only - used to manually locate
-		// call/jmp instructions when offset constants drift after a game update.
-		void LogCodeRange(const char* label, const void* ptr, size_t length)
-		{
-			if (!ptr)
-			{
-				LOG_DEBUG("ProductionMass: %s = null", label);
-				return;
-			}
-
-			const auto* bytes = reinterpret_cast<const uint8_t*>(ptr);
-			for (size_t row = 0; row < length; row += 16)
-			{
-				char hex[3 * 16 + 1] = {};
-				size_t rowLen = (length - row) < 16 ? (length - row) : 16;
-				for (size_t i = 0; i < rowLen; ++i)
-					std::snprintf(hex + i * 3, 4, "%02X ", bytes[row + i]);
-				LOG_DEBUG("ProductionMass: %s +0x%02zX: %s", label, row, hex);
-			}
 		}
 
 		// Returns the FMassEntityManager backing `world`'s Mass simulation, or
@@ -178,71 +117,25 @@ namespace ProductionMass
 				g_callback(fragment, world, entity);
 		}
 
-		// UCrMassActorComponent::GetMassFragment<FCrCraftingFragment> - see the
-		// comment on Signatures::GetMassFragment_FCrCraftingFragment. The AOB
-		// matches a call site; the E8 rel32 at the match address is followed to
-		// reach the function entry. From there, see
-		// Signatures::GetMassFragment_StaticStructCallOffset/
-		// GetMassFragment_GetFragmentDataPtrCallOffset for the call/jmp offsets.
+		// FCrCraftingFragment::StaticStruct and
+		// FMassEntityManager::InternalGetFragmentDataPtr, each asked for by its own
+		// key. Both patterns match a call site (see plugin_signatures.h), so both
+		// ask the loader to follow the E8 rel32 and judge the function it lands on.
 		bool ResolveFragmentAccessors(IPluginSelf* self, IPluginHookScanner* scanner)
 		{
-			if (!*Signatures::GetMassFragment_FCrCraftingFragment)
+			const uintptr_t staticStructAddr = PluginMap::Function(scanner, self, "FCrCraftingFragment::StaticStruct",
+				Signatures::CraftingFragmentStaticStruct, PLUGIN_SCAN_FUNCTION_START,
+				PLUGIN_SCAN_FLAG_OPTIONAL | PLUGIN_SCAN_FLAG_FOLLOW_REL32, 0,
+				Signatures::CraftingFragmentStaticStructFollowAt);
+			const uintptr_t getFragmentDataPtrAddr = PluginMap::Function(scanner, self,
+				"FMassEntityManager::InternalGetFragmentDataPtr",
+				Signatures::GetFragmentDataPtr, PLUGIN_SCAN_FUNCTION_START,
+				PLUGIN_SCAN_FLAG_OPTIONAL | PLUGIN_SCAN_FLAG_FOLLOW_REL32, 0,
+				Signatures::GetFragmentDataPtrFollowAt);
+			if (!staticStructAddr || !getFragmentDataPtrAddr)
 			{
-				scanner->ReportWarning(self, "GetMassFragment<FCrCraftingFragment>",
-					"Pattern is not set -- Mass-simulated crafting will not be tracked.");
-				LOG_WARN("ProductionMass: GetMassFragment<FCrCraftingFragment> pattern not set");
-				return false;
-			}
-
-			// This AOB deliberately matches a CALL SITE rather than the callee:
-			// GetMassFragment<T> is a template body that several instantiations
-			// share byte for byte, so the site is unique where the function is
-			// not. The loader decodes the rel32 itself (FOLLOW_REL32) -- it
-			// checks the opcode really is E8/E9 and that the target lands inside
-			// the image, which is what this call site's hand-rolled follow used
-			// to do -- and then applies the kind check to the TARGET. So
-			// uniqueness is judged on the call site and FUNCTION_START on the
-			// function it names, which is the combination that makes this
-			// pattern shape safe.
-			uint32_t flags         = PLUGIN_SCAN_FLAG_OPTIONAL;
-			int32_t  resultOffset  = 0;
-			int32_t  followRel32At = 0;   // the E8 is the first byte of the match
-
-			if (Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset == ~0ULL)
-			{
-				flags |= PLUGIN_SCAN_FLAG_FOLLOW_REL32;
-			}
-			else
-			{
-				// The other shape this signature supports: the AOB matches inside
-				// the function and the entry is a fixed distance back.
-				resultOffset = static_cast<int32_t>(Signatures::GetMassFragment_FCrCraftingFragment_EntryOffset);
-			}
-
-			const uintptr_t fragmentFn = PluginMap::Function(scanner, self, "GetMassFragment<FCrCraftingFragment>",
-				Signatures::GetMassFragment_FCrCraftingFragment, PLUGIN_SCAN_FUNCTION_START, flags,
-				resultOffset, followRel32At);
-			if (!fragmentFn)
-			{
-				LOG_WARN("ProductionMass: GetMassFragment<FCrCraftingFragment> unresolved");
-				return false;
-			}
-
-			LOG_DEBUG("ProductionMass: ResolveFragmentAccessors - fragmentFn=0x%llX",
-				static_cast<unsigned long long>(fragmentFn));
-			LogCodeRange("fragmentFn", reinterpret_cast<void*>(fragmentFn), 0x90);
-
-			uintptr_t staticStructAddr = FollowRelCall(fragmentFn + Signatures::GetMassFragment_StaticStructCallOffset);
-			uintptr_t getFragmentDataPtrAddr = FollowRelCall(fragmentFn + Signatures::GetMassFragment_GetFragmentDataPtrCallOffset);
-
-			if (!LooksLikeCodePointer(reinterpret_cast<void*>(staticStructAddr)) ||
-				!LooksLikeCodePointer(reinterpret_cast<void*>(getFragmentDataPtrAddr)))
-			{
-				scanner->ReportWarning(self, "GetMassFragment<FCrCraftingFragment>",
-					"Resolved StaticStruct/GetFragmentDataPtr fall outside the main module; the call offsets are likely wrong.");
-				LOG_WARN("ProductionMass: ResolveFragmentAccessors - resolved StaticStruct=0x%llX or "
-					"GetFragmentDataPtr=0x%llX fall outside the main module; offsets are likely wrong - "
-					"aborting before they're called",
+				LOG_WARN("ProductionMass: ResolveFragmentAccessors - StaticStruct=0x%llX or "
+					"GetFragmentDataPtr=0x%llX unresolved",
 					static_cast<unsigned long long>(staticStructAddr), static_cast<unsigned long long>(getFragmentDataPtrAddr));
 				return false;
 			}

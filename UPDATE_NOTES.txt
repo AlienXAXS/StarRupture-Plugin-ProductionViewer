@@ -1,1 +1,2 @@
 - Fixes a possible crash from the waypoint overlay reading the player position off the game thread
+- Finds the crafting-fragment accessors through the loader's version map, so a game update no longer needs a plugin change for them
