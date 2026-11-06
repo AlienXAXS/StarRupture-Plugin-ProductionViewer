@@ -4,25 +4,20 @@
 
 #include <string>
 
-// Pre-loads item/recipe icons (UTexture2D -> ImGui texture handle) for every
-// item type in the game, keyed by UAuItemDataBase::UniqueItemName.
-//
-// Mirrors BetterCheats' Panels::Items icon-loading pattern: the asset
-// registry scan and UTexture2D -> GPU texture copy happen on the game thread
-// (posted from Init), with retries driven from OnEngineTick in case D3D12
-// wasn't ready yet. The splash screen is held open (AcquireSplashHold) until
-// the initial scan + texture copy completes, so the user sees load progress.
+// Item icons for the tracker's rows (UTexture2D -> ImGui texture handle), keyed
+// by UAuItemDataBase::UniqueItemName. The SDK's item_icons.h does the loading:
+// an icon is copied the first time a row draws it, a few per engine tick.
 namespace ProductionIcons
 {
 	void Init(IPluginSelf* self);
 	void Shutdown();
 
-	// Adopts any freshly-scanned icon list and retries texture loads that
-	// returned NULL earlier (D3D12 not ready yet). Call once per engine tick.
+	// Loads the icons rows have asked for. Call once per engine tick.
 	void Tick();
 
-	// Returns a texture handle for the given UniqueItemName, or nullptr if
-	// the item has no icon, hasn't been resolved yet, or its texture hasn't
-	// loaded yet.
-	PluginTextureHandle GetIcon(const std::string& uniqueItemName);
+	// Draws the item's icon at the cursor, then moves on by gap. An icon that
+	// is still loading leaves an empty square, and an item with no icon takes
+	// no room. Call from a render callback.
+	void Draw(IModLoaderImGui* imgui, IPluginImGuiTextures* textures,
+		const std::string& uniqueItemName, float size, float gap);
 }

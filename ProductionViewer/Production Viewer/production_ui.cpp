@@ -1,5 +1,6 @@
 #include "production_ui.h"
 #include "production_data.h"
+#include "production_icons.h"
 #include "production_tracker.h"
 #include "production_waypoint.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
@@ -289,11 +290,7 @@ namespace ProductionUI
 				}
 				imgui->SameLine(0.0f, 0.0f);
 
-				if (entry.icon && textures)
-				{
-					textures->Image(entry.icon, kIconSize, kIconSize);
-					imgui->SameLine(0.0f, 4.0f);
-				}
+				ProductionIcons::Draw(imgui, textures, entry.iconKey, kIconSize, 4.0f);
 				imgui->Text(entry.name.c_str());
 
 				imgui->TableNextColumn();
