@@ -1,1 +1,2 @@
 - Fixes a possible crash from the waypoint overlay reading the player position off the game thread
+- Fixes a possible crash after loading when an item icon could not be shown right away and the game then freed its texture

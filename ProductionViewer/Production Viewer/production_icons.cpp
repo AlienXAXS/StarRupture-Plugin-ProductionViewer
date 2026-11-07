@@ -1,6 +1,7 @@
 #include "production_icons.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
 #include "production_fields.h"
+#include "object_ref.h"
 
 #include "Chimera_classes.hpp"
 #include "AuItems_classes.hpp"
@@ -18,7 +19,9 @@ namespace ProductionIcons
 	{
 		struct IconEntry
 		{
-			SDK::UTexture2D*    icon            = nullptr; // UTexture2D from ItemIcon.ResourceObject
+			// UTexture2D from ItemIcon.ResourceObject. Nothing keeps its package
+			// loaded, so it can be freed between ticks: read it only through Get().
+			ObjectRef<SDK::UTexture2D> icon;
 			bool                iconIsTexture2D = false;
 			PluginTextureHandle handle          = nullptr;
 		};
@@ -44,7 +47,7 @@ namespace ProductionIcons
 		bool HasMissingHandles(const std::unordered_map<std::string, IconEntry>& icons)
 		{
 			for (const auto& [key, entry] : icons)
-				if (entry.iconIsTexture2D && entry.icon && !entry.handle)
+				if (entry.iconIsTexture2D && !entry.handle && entry.icon.Get())
 					return true;
 			return false;
 		}
@@ -83,10 +86,11 @@ namespace ProductionIcons
 
 			for (auto& [key, entry] : icons)
 			{
-				if (entry.iconIsTexture2D && entry.icon && !entry.handle)
+				SDK::UTexture2D* icon = (entry.iconIsTexture2D && !entry.handle) ? entry.icon.Get() : nullptr;
+				if (icon)
 				{
-					const std::string texName = entry.icon->GetName();
-					entry.handle = hooks->ImGuiTextures->LoadFromUTexture2D(entry.icon, texName.c_str());
+					const std::string texName = icon->GetName();
+					entry.handle = hooks->ImGuiTextures->LoadFromUTexture2D(icon, texName.c_str());
 				}
 
 				if (splash && splash->IsVisible() && total > 0)
@@ -303,15 +307,17 @@ namespace ProductionIcons
 							continue;
 
 						IconEntry entry;
-						entry.icon = GetItemIconResource(item);
-						if (entry.icon)
+						SDK::UTexture2D* icon = GetItemIconResource(item);
+						if (icon)
 						{
-							try { entry.iconIsTexture2D = entry.icon->IsA(SDK::UTexture2D::StaticClass()); }
+							try { entry.iconIsTexture2D = icon->IsA(SDK::UTexture2D::StaticClass()); }
 							catch (...) {}
 						}
 
-						if (!entry.icon || !entry.iconIsTexture2D)
+						if (!icon || !entry.iconIsTexture2D)
 							continue;
+
+						entry.icon.Set(icon);
 
 						icons.emplace(uniqueName, std::move(entry));
 					}
