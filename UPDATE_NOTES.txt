@@ -1,2 +1,3 @@
 - Fixes a possible crash from the waypoint overlay reading the player position off the game thread
 - Keeps working if a game update changes the size of the base core query results
+- Counts a recipe's output from the running game's function layout, so it keeps working after game updates

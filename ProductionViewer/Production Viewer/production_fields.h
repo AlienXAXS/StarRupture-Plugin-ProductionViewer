@@ -7,6 +7,7 @@
 #include "MassCommon_structs.hpp"
 #include "MassSignals_classes.hpp"
 #include "AuItems_structs.hpp"
+#include "AuCrafting_parameters.hpp"
 #include "plugin_map.h"
 
 #include <cstdint>
@@ -41,6 +42,11 @@ namespace ProductionViewerFields
 	inline auto ItemStackData  = PRODUCTIONVIEWER_FIELD(FAuSimpleItem, ItemDataBase);
 	inline auto ItemStackCount = PRODUCTIONVIEWER_FIELD(FAuSimpleItem, Count);
 	inline auto ItemStackSize  = SR_SIZE(FAuSimpleItem);
+
+	// GetOutputItem's parameter block and its return value (the item stack), at
+	// the size and offset the running game reflects (PluginMap::ParamsBlockOf).
+	inline auto OutputItemSize   = SR_PARAMS_SIZE(AuItemRecipeData, GetOutputItem);
+	inline auto OutputItemReturn = SR_PARAM(AuItemRecipeData, GetOutputItem, ReturnValue);
 
 	// The game's constructor fills a buffer of the helper's size on the running
 	// build (PluginMap::StructBuffer); the name subsystem reads it back.
@@ -107,6 +113,7 @@ namespace ProductionViewerFields
 			"UMassSignalSubsystem::SignalEntity",
 			CraftingSelectedRecipe, CraftingCurrentRecipe, CraftingMultiplier,
 			ItemUniqueName, ItemName, ItemStackData, ItemStackCount, ItemStackSize,
+			OutputItemSize, OutputItemReturn,
 			PluginMap::MassEntityManagerField, PluginMap::MassSignalWorldField()), {} };
 	inline PluginMap::Feature BaseCores{ "basecores", "Splitting production by base",
 		KeysOf("UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding",
@@ -134,7 +141,7 @@ namespace ProductionViewerFields
 		bool all = PluginMap::ResolveFields(scanner, self,
 			ItemUniqueName, ItemName, ItemIcon,
 			CraftingSelectedRecipe, CraftingCurrentRecipe, CraftingMultiplier,
-			ItemStackData, ItemStackCount, ItemStackSize, ReplicationHelperSize,
+			ItemStackData, ItemStackCount, ItemStackSize, OutputItemSize, OutputItemReturn, ReplicationHelperSize,
 			TransformFragmentTransform, GridEntityHandleSize);
 		all = PluginMap::ResolveMassSignalWorld(scanner, self) && all;
 		all = PluginMap::ResolveMassEntityManager(scanner, self) && all;
