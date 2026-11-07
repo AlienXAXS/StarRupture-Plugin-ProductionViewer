@@ -1,1 +1,2 @@
 - Fixes a possible crash from the waypoint overlay reading the player position off the game thread
+- Keeps working if a game update changes the size of the base core query results

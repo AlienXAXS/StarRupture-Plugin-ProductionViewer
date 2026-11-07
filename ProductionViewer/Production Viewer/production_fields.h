@@ -57,7 +57,9 @@ namespace ProductionViewerFields
 		"FCrGridEntityHandle", "EntityHandle", PLUGIN_FIELD_NATIVE, sizeof(uint64_t), 0x0 } };
 	inline auto GridEntityData = PluginField<SharedRef>{ { "FCrGridEntityHandle::Data",
 		"FCrGridEntityHandle", "Data", PLUGIN_FIELD_NATIVE, sizeof(SharedRef), 0x8 } };
-	inline auto GridEntityHandleSize = SR_SIZE_CHECK(FCrGridEntityHandle);
+	// Stepped through as an array element: the size the running game reflects,
+	// read with PluginMap::ElementAt.
+	inline auto GridEntityHandleSize = SR_SIZE(FCrGridEntityHandle);
 
 	// An FTransform's translation. The engine's struct keeps it in a SIMD
 	// register, 0x20 bytes in the PDB, while the reflected and SDK member is the

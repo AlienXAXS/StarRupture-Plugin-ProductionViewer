@@ -170,12 +170,13 @@ namespace ProductionBaseCore
 			// FCrGridEntityHandle is { FMassEntityHandle EntityHandle;
 			// TSharedPtr<FCrGridEntityDataBase> Data; }. Only the entity handle
 			// matters to us; Data's controller is released below. The stride is
-			// the struct's size, checked against the running build.
-			auto* elements = static_cast<const SDK::FCrGridEntityHandle*>(out.Data);
+			// the struct's size on the running build.
 			for (int32_t i = 0; i < out.ArrayNum; ++i)
 			{
-				const uint64_t* handleBits = ProductionViewerFields::GridEntityHandle.In(&elements[i]);
-				const ProductionViewerFields::SharedRef* data = ProductionViewerFields::GridEntityData.In(&elements[i]);
+				const uint8_t* element = PluginMap::ElementAt(out.Data, out.ArrayNum, i,
+					ProductionViewerFields::GridEntityHandleSize);
+				const uint64_t* handleBits = ProductionViewerFields::GridEntityHandle.In(element);
+				const ProductionViewerFields::SharedRef* data = ProductionViewerFields::GridEntityData.In(element);
 				if (!handleBits)
 				{
 					if (data)
