@@ -18,6 +18,7 @@
 #include "AuItems_structs.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <map>
 #include <mutex>
 
@@ -219,6 +220,66 @@ namespace ProductionTracker
 			return addr > 0x10000 && addr < 0x0000800000000000ULL;
 		}
 
+		// UFunction::NumParms (uint8) and ParmsSize (uint16): the parameter count and
+		// the byte size of the block ProcessEvent marshals. The SDK pads them
+		// (Pad_B4), so they are read from there. An engine layout, not a game one.
+		static_assert(offsetof(SDK::UFunction, Pad_B4) == 0xB4,
+			"UFunction layout changed: re-check where NumParms and ParmsSize are read");
+
+		uint8_t NumParmsOf(const SDK::UFunction* function)
+		{
+			return function->Pad_B4[0];
+		}
+
+		uint16_t ParmsSizeOf(const SDK::UFunction* function)
+		{
+			uint16_t size = 0;
+			std::memcpy(&size, &function->Pad_B4[2], sizeof(size));
+			return size;
+		}
+
+		// Calls UAuItemRecipeData::GetOutputItem and reads the item and its count off
+		// the FAuSimpleItem it returns. The game fills that struct, so the call gets
+		// a parameter block of the function's live ParmsSize (the return value is
+		// its only parameter, at offset 0) instead of a compiled FAuSimpleItem.
+		// False when the function or the item stack's size is not what this expects;
+		// the caller then skips the completion.
+		bool ReadOutputItem(SDK::UCrItemRecipeData* recipe, SDK::UAuItemDataBase*& outItem, int32_t& outCount)
+		{
+			outItem = nullptr;
+			outCount = 0;
+
+			SDK::UFunction* function = SDK::UAuItemRecipeData::StaticClass()->GetFunction("AuItemRecipeData", "GetOutputItem");
+			const uint32_t parmsSize = function ? ParmsSizeOf(function) : 0;
+			if (!function || NumParmsOf(function) != 1 || parmsSize < ProductionViewerFields::ItemStackSize.resolvedSize)
+			{
+				static bool s_logged = false;
+				if (!s_logged)
+				{
+					s_logged = true;
+					LOG_WARN("ProductionTracker: GetOutputItem takes %u parameter(s) in 0x%X bytes, not one that holds an item stack (0x%X) - "
+						"output counting skipped.", function ? NumParmsOf(function) : 0, parmsSize,
+						ProductionViewerFields::ItemStackSize.resolvedSize);
+				}
+				return false;
+			}
+
+			PluginMap::ParamsBlock call(parmsSize, { { "ReturnValue", 0, parmsSize } });
+
+			// Native flag set around the call, as the SDK's own wrappers do.
+			const auto flags = function->FunctionFlags;
+			function->FunctionFlags |= 0x400;
+			const bool called = PluginMap::Call(recipe, function, call);
+			function->FunctionFlags = flags;
+			if (!called)
+				return false;
+
+			const uint8_t* item = call.Param("ReturnValue");
+			outItem = ProductionViewerFields::ValueOr<SDK::UAuItemDataBase*>(ProductionViewerFields::ItemStackData, item);
+			outCount = ProductionViewerFields::ValueOr<int32_t>(ProductionViewerFields::ItemStackCount, item);
+			return true;
+		}
+
 		void OnMassCraftingComplete(const SDK::FCrCraftingFragment* fragment, SDK::UWorld* world,
 			ProductionMass::FMassEntityHandle entity)
 		{
@@ -267,24 +328,27 @@ namespace ProductionTracker
 				bases.empty() ? "" : ", first: ", bases.empty() ? "" : bases[0].name.c_str());
 
 			LOG_DEBUG("ProductionTracker: OnMassCraftingComplete - calling GetOutputItem on recipe=%p", recipe);
-			SDK::FAuSimpleItem outputItem = recipe->GetOutputItem();
+			SDK::UAuItemDataBase* outputData = nullptr;
+			int32_t outputCount = 0;
+			if (!ReadOutputItem(recipe, outputData, outputCount))
+				return;
 			std::string outputKey, outputDisplayName;
-			SDK::UAuItemDataBase* outputData = ProductionViewerFields::ValueOr<SDK::UAuItemDataBase*>(
-				ProductionViewerFields::ItemStackData, &outputItem);
-			const int32_t outputCount = ProductionViewerFields::ValueOr<int32_t>(
-				ProductionViewerFields::ItemStackCount, &outputItem);
 			ResolveItemNames(outputData, outputKey, outputDisplayName);
 			LOG_DEBUG("ProductionTracker: OnMassCraftingComplete - output '%s' (%s) x%d (multiplier %d)",
 				outputDisplayName.c_str(), outputKey.c_str(), outputCount, multiplier);
 
 			RecordSample(outputData, static_cast<float>(outputCount * multiplier), true, bases);
 
-			for (const SDK::FAuSimpleItem& resource : recipe->GetNeededResources())
+			// The elements are the game's, so they are stepped at the size the running
+			// build reflects for an item stack.
+			const auto neededResources = recipe->GetNeededResources();
+			for (int32_t i = 0; i < neededResources.Num(); ++i)
 			{
+				const uint8_t* resource = PluginMap::ElementAt(neededResources, i, ProductionViewerFields::ItemStackSize);
 				RecordSample(ProductionViewerFields::ValueOr<SDK::UAuItemDataBase*>(
-						ProductionViewerFields::ItemStackData, &resource),
+						ProductionViewerFields::ItemStackData, resource),
 					static_cast<float>(ProductionViewerFields::ValueOr<int32_t>(
-						ProductionViewerFields::ItemStackCount, &resource) * multiplier),
+						ProductionViewerFields::ItemStackCount, resource) * multiplier),
 					false, bases);
 			}
 		}

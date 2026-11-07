@@ -16,9 +16,11 @@
 // Every member of a game class the production viewer reads, taken from the
 // loader's map for the running game build (see plugin_map.h). Resolved once in
 // OnPluginLoadHooks; read on the game thread with In(object), which is null
-// when the object is null or the member did not resolve. Structs that are only
-// stepped through (an array's elements, a stack copy handed to the game) are
-// covered by a size check. Engine members (UObject, UWorld, FVector, the
+// when the object is null or the member did not resolve. Structs that are
+// stepped through (an array's elements) or that the game fills (a native
+// constructor's output, a function's return value) are sized from the running
+// build (SR_SIZE) and held in PluginMap::StructBuffer / PluginMap::ParamsBlock,
+// never at a compiled size. Engine members (UObject, UWorld, FVector, the
 // refcount of a TSharedPtr controller) stay compiled in.
 
 #define PRODUCTIONVIEWER_FIELD(Class, Member) SR_FIELD(decltype(SDK::Class::Member), Class, Member, 0)
@@ -33,14 +35,16 @@ namespace ProductionViewerFields
 	inline auto CraftingCurrentRecipe  = PRODUCTIONVIEWER_FIELD(FCrCraftingFragment, CurrentRecipe);
 	inline auto CraftingMultiplier     = PRODUCTIONVIEWER_FIELD(FCrCraftingFragment, CraftingMultiplier);
 
-	// An item stack, read off a recipe's output and inputs.
+	// An item stack, read off a recipe's output and inputs. The recipe's needed
+	// resources are stepped through at the size the running game reflects, and
+	// the output item comes back from the game in a block of that size.
 	inline auto ItemStackData  = PRODUCTIONVIEWER_FIELD(FAuSimpleItem, ItemDataBase);
 	inline auto ItemStackCount = PRODUCTIONVIEWER_FIELD(FAuSimpleItem, Count);
-	inline auto ItemStackSize  = SR_SIZE_CHECK(FAuSimpleItem);
+	inline auto ItemStackSize  = SR_SIZE(FAuSimpleItem);
 
-	// A stack copy of the helper is handed to the game's constructor, so the
-	// whole struct is checked against the running build.
-	inline auto ReplicationHelperSize = SR_SIZE_CHECK(FCrMassEntityReplicationHelper);
+	// The game's constructor fills a buffer of the helper's size on the running
+	// build (PluginMap::StructBuffer); the name subsystem reads it back.
+	inline auto ReplicationHelperSize = SR_SIZE(FCrMassEntityReplicationHelper);
 
 	// The transform a Mass entity's FTransformFragment holds. Reflected. The
 	// entity manager and the signal subsystem's world come from the SDK's Mass
