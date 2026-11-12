@@ -1,1 +1,1 @@
-- Item icons now come from the loader's image library. A row keeps its place while its icon loads, and without the library the rows show no icons
+- Item icons now come from the loader's image library. A row keeps its place while its icon loads. This version needs ModLoader 1.24.0 or newer

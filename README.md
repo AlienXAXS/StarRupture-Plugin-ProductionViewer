@@ -5,7 +5,7 @@ factories produce and consume, and shows it in a live, searchable dashboard.
 
 **Target:** Game client, plus a headless server build that feeds connected clients
 
-**Requires:** [StarRupture-ModLoader](https://github.com/AlienXAXS/StarRupture-ModLoader) v1.23.0 or later
+**Requires:** [StarRupture-ModLoader](https://github.com/AlienXAXS/StarRupture-ModLoader) v1.24.0 or later
 
 ---
 
@@ -34,8 +34,7 @@ two columns: **Production** and **Consumption**. Each column shows:
   the player (actor-based hook) and for Mass-simulated factories far from the
   player (Mass ECS signal hook), so totals stay accurate across the whole base.
 - **Icons** -- item icons are shown next to each item name. They come from the
-  loader's image library, and a row whose icon is still loading keeps its place. On a
-  loader without the image library the rows show no icons and everything else works.
+  loader's image library, and a row whose icon is still loading keeps its place.
 
 ### Multiplayer
 
