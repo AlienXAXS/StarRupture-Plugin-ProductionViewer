@@ -4,20 +4,14 @@
 
 #include <string>
 
-// Item icons for the tracker's rows (UTexture2D -> ImGui texture handle), keyed
-// by UAuItemDataBase::UniqueItemName. The SDK's item_icons.h does the loading:
-// an icon is copied the first time a row draws it, a few per engine tick.
+// Item icons for the tracker's rows. The loader's image library does the
+// loading; this only registers the item set and names an item's image.
 namespace ProductionIcons
 {
+	// Tells the library the item set is drawn from. Call once at start.
 	void Init(IPluginSelf* self);
-	void Shutdown();
 
-	// Loads the icons rows have asked for. Call once per engine tick.
-	void Tick();
-
-	// Draws the item's icon at the cursor, then moves on by gap. An icon that
-	// is still loading leaves an empty square, and an item with no icon takes
-	// no room. Call from a render callback.
-	void Draw(IModLoaderImGui* imgui, IPluginImGuiTextures* textures,
-		const std::string& uniqueItemName, float size, float gap);
+	// The library's id for an item's image, or 0 when the loader has no image
+	// library. Any thread; reads nothing.
+	PluginImageId IdOf(const std::string& uniqueItemName);
 }

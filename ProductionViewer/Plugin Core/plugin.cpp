@@ -121,7 +121,7 @@ extern "C" {
 		// Start tracking production/consumption via the crafting hook
 		ProductionTracker::Init(self);
 
-		// Kick off the asset-registry scan that pre-loads item/recipe icons
+		// Register the item set with the loader's image library
 		ProductionIcons::Init(self);
 
 		if (self->hooks->World)
@@ -149,7 +149,6 @@ extern "C" {
 
 		ProductionNet::Shutdown(g_self);
 		ProductionTracker::Shutdown(g_self);
-		ProductionIcons::Shutdown();
 		ProductionWaypoint::Shutdown(g_self);
 		ProductionUI::Shutdown(g_self);
 		ProductionViewer::Storage::Shutdown();

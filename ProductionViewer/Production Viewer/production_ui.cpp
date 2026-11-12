@@ -1,6 +1,6 @@
 #include "production_ui.h"
 #include "production_data.h"
-#include "production_icons.h"
+#include "plugin_images.h"
 #include "production_tracker.h"
 #include "production_waypoint.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
@@ -249,7 +249,6 @@ namespace ProductionUI
 			imgui->TableSetupColumn("Rate", kColumnFlagsWidthFixed, 60.0f);
 			imgui->TableHeadersRow();
 
-			IPluginImGuiTextures* textures = GetHooks() ? GetHooks()->ImGuiTextures : nullptr;
 			constexpr float kIconSize = 20.0f;
 			constexpr float kGraphHeight = 20.0f;
 
@@ -290,7 +289,8 @@ namespace ProductionUI
 				}
 				imgui->SameLine(0.0f, 0.0f);
 
-				ProductionIcons::Draw(imgui, textures, entry.iconKey, kIconSize, 4.0f);
+				PluginImages::Image(imgui, GetHooks(), entry.iconId, kIconSize, kIconSize);
+				imgui->SameLine(0.0f, 4.0f);
 				imgui->Text(entry.name.c_str());
 
 				imgui->TableNextColumn();

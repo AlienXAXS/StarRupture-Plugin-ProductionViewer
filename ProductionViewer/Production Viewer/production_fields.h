@@ -27,7 +27,6 @@ namespace ProductionViewerFields
 {
 	inline auto ItemUniqueName = PRODUCTIONVIEWER_FIELD(UAuItemDataBase, UniqueItemName);
 	inline auto ItemName       = PRODUCTIONVIEWER_FIELD(UAuItemDataBase, ItemName);
-	inline auto ItemIcon       = PRODUCTIONVIEWER_FIELD(UAuItemDataBase, ItemIcon);
 
 	inline auto CraftingSelectedRecipe = PRODUCTIONVIEWER_FIELD(FCrCraftingFragment, SelectedRecipe);
 	inline auto CraftingCurrentRecipe  = PRODUCTIONVIEWER_FIELD(FCrCraftingFragment, CurrentRecipe);
@@ -110,7 +109,6 @@ namespace ProductionViewerFields
 			"UCrBuildingCustomNameSubsystem::GetBuildingCustomNameByReplicationHelper",
 			ReplicationHelperSize, GridEntityHandle, GridEntityData, GridEntityHandleSize,
 			PluginMap::MassEntityManagerField, TransformFragmentTransform, TransformTranslation), {} };
-	inline PluginMap::Feature ItemIcons{ "icons", "Item icons", KeysOf(ItemIcon, ItemUniqueName), {} };
 	inline PluginMap::Feature SessionSave{ "sessionsave", "Keeping totals for each saved game",
 		KeysOf(ServerSessionName), {} };
 
@@ -118,7 +116,7 @@ namespace ProductionViewerFields
 	// lands on a feature and not on the plugin.
 	inline void DeclareFeatures(IPluginSelf* self, IPluginHookScanner* scanner)
 	{
-		PluginMap::DeclareFeatures(scanner, self, Tracking, BaseCores, ItemIcons, SessionSave);
+		PluginMap::DeclareFeatures(scanner, self, Tracking, BaseCores, SessionSave);
 	}
 
 	// Asks the loader for every row above. False when any did not resolve; the
@@ -126,7 +124,7 @@ namespace ProductionViewerFields
 	inline bool Resolve(IPluginSelf* self, IPluginHookScanner* scanner)
 	{
 		bool all = PluginMap::ResolveFields(scanner, self,
-			ItemUniqueName, ItemName, ItemIcon,
+			ItemUniqueName, ItemName,
 			CraftingSelectedRecipe, CraftingCurrentRecipe, CraftingMultiplier,
 			ItemStackData, ItemStackCount, ItemStackSize, ReplicationHelperSize,
 			TransformFragmentTransform, GridEntityHandleSize);

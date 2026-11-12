@@ -1,1 +1,1 @@
-- Item icons load the first time they are shown, and Production Viewer no longer holds the loading screen to copy them
+- Item icons now come from the loader's image library. A row keeps its place while its icon loads, and without the library the rows show no icons

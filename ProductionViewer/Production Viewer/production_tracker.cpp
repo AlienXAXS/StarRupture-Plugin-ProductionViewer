@@ -312,7 +312,6 @@ namespace ProductionTracker
 
 		void OnEngineTick(float deltaSeconds)
 		{
-			ProductionIcons::Tick();
 			ProductionBaseCore::Tick(deltaSeconds);
 			ProductionWaypoint::Tick();
 			ProductionNet::Tick(deltaSeconds);
@@ -454,7 +453,7 @@ namespace ProductionTracker
 					entry.ratePerMinute = record.production.GetRatePerMinute(TimeRange::Minutes1);
 					entry.history = record.production.GetHistory(range);
 					entry.historyRatePerMinute = record.production.GetHistoryRatePerMinute(range);
-					entry.iconKey = key;
+					entry.iconId = ProductionIcons::IdOf(key);
 					entry.baseBreakdown = buildBreakdown(record.perBase, true);
 					items.production.push_back(std::move(entry));
 				}
@@ -467,7 +466,7 @@ namespace ProductionTracker
 					entry.ratePerMinute = record.consumption.GetRatePerMinute(TimeRange::Minutes1);
 					entry.history = record.consumption.GetHistory(range);
 					entry.historyRatePerMinute = record.consumption.GetHistoryRatePerMinute(range);
-					entry.iconKey = key;
+					entry.iconId = ProductionIcons::IdOf(key);
 					entry.baseBreakdown = buildBreakdown(record.perBase, false);
 					items.consumption.push_back(std::move(entry));
 				}

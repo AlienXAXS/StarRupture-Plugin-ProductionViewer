@@ -33,9 +33,9 @@ two columns: **Production** and **Consumption**. Each column shows:
 - **Crafting coverage** -- production/consumption is tracked both for crafters near
   the player (actor-based hook) and for Mass-simulated factories far from the
   player (Mass ECS signal hook), so totals stay accurate across the whole base.
-- **Icons** -- item icons are shown next to each item name. They are copied the first
-  time a row draws them, not all at launch, so Production Viewer no longer holds the
-  loading screen to copy them. A row whose icon is still loading keeps its place.
+- **Icons** -- item icons are shown next to each item name. They come from the
+  loader's image library, and a row whose icon is still loading keeps its place. On a
+  loader without the image library the rows show no icons and everything else works.
 
 ### Multiplayer
 

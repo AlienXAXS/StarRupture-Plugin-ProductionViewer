@@ -33,7 +33,7 @@ namespace ProductionData
 		float ratePerMinute;                        // current rate
 		std::array<float, kHistorySamples> history;            // sparkline data (raw bucket amounts), oldest -> newest
 		std::array<float, kHistorySamples> historyRatePerMinute; // sparkline data as per-minute rates
-		std::string iconKey;                        // UniqueItemName, which ProductionIcons::Draw takes to draw the item's icon
+		PluginImageId iconId = 0;                   // the image library's id for the item's icon; 0 when there is none
 		std::vector<BaseCoreBreakdown> baseBreakdown; // per-base activity, nearest first (session-scoped)
 	};
 
