@@ -62,7 +62,9 @@ namespace ProductionTracker
 		bool g_sessionLoadPending = false;
 
 		// Resolves a stable key + display name for an item, falling back to the
-		// key itself if no localized display name is available.
+		// key itself if no localized display name is available. Ammo and the
+		// blueprint items leave UniqueItemName unset ("None"), so the item
+		// object's own name keys them instead of merging them into one record.
 		void ResolveItemNames(SDK::UAuItemDataBase* itemData, std::string& outKey, std::string& outDisplayName)
 		{
 			if (!itemData)
@@ -75,6 +77,8 @@ namespace ProductionTracker
 			const SDK::FName* uniqueName = ProductionViewerFields::ItemUniqueName.In(itemData);
 			const SDK::FText* itemName = ProductionViewerFields::ItemName.In(itemData);
 			outKey = uniqueName ? uniqueName->ToString() : std::string();
+			if (outKey == "None")
+				outKey = itemData->GetName();
 			outDisplayName = itemName ? SDK::UKismetTextLibrary::Conv_TextToString(*itemName).ToString() : std::string();
 
 			if (outKey.empty())

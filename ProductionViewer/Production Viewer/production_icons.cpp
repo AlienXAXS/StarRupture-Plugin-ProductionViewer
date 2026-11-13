@@ -17,6 +17,9 @@ namespace ProductionIcons
 		if (!hooks || !hooks->Images || !self)
 			return 0;
 
+		if (uniqueItemName.empty() || uniqueItemName == "None")
+			return 0;
+
 		return hooks->Images->Item(self, uniqueItemName.c_str());
 	}
 }

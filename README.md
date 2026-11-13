@@ -35,6 +35,7 @@ two columns: **Production** and **Consumption**. Each column shows:
   player (Mass ECS signal hook), so totals stay accurate across the whole base.
 - **Icons** -- item icons are shown next to each item name. They come from the
   loader's image library, and a row whose icon is still loading keeps its place.
+  Ammo and the blueprint items are tracked as separate items, each with its own icon.
 
 ### Multiplayer
 
