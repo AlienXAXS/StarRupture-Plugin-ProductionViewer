@@ -1,2 +1,2 @@
 - Item icons now come from the loader's image library. A row keeps its place while its icon loads. This version needs ModLoader 1.24.0 or newer
-- Ammo and the blueprint items are now counted as separate items, each with its own icon. They used to be added together into one row with the Ammo icon
+- Ammo and the blueprint items are now counted as separate items, each with its own icon. They used to be added together into one row with the Ammo icon. That old combined row is removed from saved sessions, so these items count again from zero

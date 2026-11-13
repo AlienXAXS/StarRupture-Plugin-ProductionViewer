@@ -1,5 +1,6 @@
 #include "production_icons.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
+#include "production_fields.h"
 
 namespace ProductionIcons
 {
@@ -17,7 +18,7 @@ namespace ProductionIcons
 		if (!hooks || !hooks->Images || !self)
 			return 0;
 
-		if (uniqueItemName.empty() || uniqueItemName == "None")
+		if (uniqueItemName.empty() || uniqueItemName == ProductionViewerFields::kUnknownItem)
 			return 0;
 
 		return hooks->Images->Item(self, uniqueItemName.c_str());

@@ -18,8 +18,10 @@ namespace ProductionNet
 	constexpr uint8_t kSchemaVersion = 2;
 
 	// Fixed string capacities, all including the null terminator. Item keys are
-	// UAuItemDataBase::UniqueItemName (short internal identifiers); base names
-	// are player-assigned and are truncated rather than split across packets.
+	// ProductionViewerFields::ItemKeyOf (the unique name, or the asset name; both
+	// are internal identifiers, and one longer than the field is cut, so a joining
+	// player may get no icon for it); base names are player-assigned and are
+	// truncated rather than split across packets.
 	constexpr int kItemKeyChars  = 48;
 	constexpr int kItemNameChars = 48;
 	constexpr int kBaseNameChars = 48;
@@ -62,7 +64,7 @@ namespace ProductionNet
 			float    allTimeProduced;
 			float    allTimeConsumed;
 			float    allTimeElapsed;             // seconds the item has been tracked
-			char     key[kItemKeyChars];         // UniqueItemName - also the client's icon lookup key
+			char     key[kItemKeyChars];         // ItemKeyOf - also the client's icon lookup key
 			char     displayName[kItemNameChars];
 		} entries[kItemDefsPerPacket];
 	};

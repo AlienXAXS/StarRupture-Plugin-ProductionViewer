@@ -36,6 +36,8 @@ two columns: **Production** and **Consumption**. Each column shows:
 - **Icons** -- item icons are shown next to each item name. They come from the
   loader's image library, and a row whose icon is still loading keeps its place.
   Ammo and the blueprint items are tracked as separate items, each with its own icon.
+  The old combined row from an earlier version is removed from saved sessions, so these
+  items count again from zero.
 
 ### Multiplayer
 

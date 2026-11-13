@@ -12,6 +12,7 @@ namespace ProductionIcons
 	void Init(IPluginSelf* self);
 
 	// The library's id for an item's image, or 0 when the loader has no image
-	// library or the name is empty or "None". Any thread; reads nothing.
+	// library, or the name is empty or stands for an item that could not be read.
+	// Any thread; reads nothing.
 	PluginImageId IdOf(const std::string& uniqueItemName);
 }

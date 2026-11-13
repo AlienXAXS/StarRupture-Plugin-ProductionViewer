@@ -52,7 +52,7 @@ namespace ProductionTracker
 		};
 
 		std::mutex g_mutex;
-		std::map<std::string, ItemRecord> g_items; // key: UniqueItemName
+		std::map<std::string, ItemRecord> g_items; // key: ProductionViewerFields::ItemKeyOf
 		float g_saveTimer = 0.0f;
 
 		// The session file is only loaded once the session role is known: a
@@ -62,27 +62,22 @@ namespace ProductionTracker
 		bool g_sessionLoadPending = false;
 
 		// Resolves a stable key + display name for an item, falling back to the
-		// key itself if no localized display name is available. Ammo and the
-		// blueprint items leave UniqueItemName unset ("None"), so the item
-		// object's own name keys them instead of merging them into one record.
+		// key itself if no localized display name is available.
 		void ResolveItemNames(SDK::UAuItemDataBase* itemData, std::string& outKey, std::string& outDisplayName)
 		{
 			if (!itemData)
 			{
-				outKey = "Unknown";
-				outDisplayName = "Unknown";
+				outKey = ProductionViewerFields::kUnknownItem;
+				outDisplayName = ProductionViewerFields::kUnknownItem;
 				return;
 			}
 
-			const SDK::FName* uniqueName = ProductionViewerFields::ItemUniqueName.In(itemData);
 			const SDK::FText* itemName = ProductionViewerFields::ItemName.In(itemData);
-			outKey = uniqueName ? uniqueName->ToString() : std::string();
-			if (outKey == "None")
-				outKey = itemData->GetName();
+			outKey = ProductionViewerFields::ItemKeyOf(itemData);
 			outDisplayName = itemName ? SDK::UKismetTextLibrary::Conv_TextToString(*itemName).ToString() : std::string();
 
 			if (outKey.empty())
-				outKey = "Unknown";
+				outKey = ProductionViewerFields::kUnknownItem;
 			if (outDisplayName.empty())
 				outDisplayName = outKey;
 		}
@@ -195,6 +190,11 @@ namespace ProductionTracker
 			std::lock_guard<std::mutex> lock(g_mutex);
 			for (auto it = items.begin(); it != items.end(); ++it)
 			{
+				// Records saved under "None" before unnamed items had keys of their own
+				// hold several items added together; they are dropped and not saved again.
+				if (it.key() == ProductionViewerFields::kUnsetUniqueName)
+					continue;
+
 				ItemRecord& record = g_items[it.key()];
 				const nlohmann::json& entry = it.value();
 
