@@ -250,7 +250,8 @@ namespace ProductionUI
 			imgui->TableHeadersRow();
 
 			constexpr float kIconSize = PluginImages::kMinSize;
-			constexpr float kGraphHeight = 20.0f;
+			// As tall as the icon, so the graph shares the row's centre line.
+			constexpr float kGraphHeight = kIconSize;
 
 			// ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap
 			constexpr int kRowSelectableFlags = (1 << 1) | (1 << 4);
