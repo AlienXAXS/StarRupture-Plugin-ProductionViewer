@@ -249,7 +249,7 @@ namespace ProductionUI
 			imgui->TableSetupColumn("Rate", kColumnFlagsWidthFixed, 60.0f);
 			imgui->TableHeadersRow();
 
-			constexpr float kIconSize = 20.0f;
+			constexpr float kIconSize = PluginImages::kMinSize;
 			constexpr float kGraphHeight = 20.0f;
 
 			// ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap
@@ -269,7 +269,7 @@ namespace ProductionUI
 				// still render normally.
 				const std::string expandKey = std::string(tableId) + "/" + entry.name;
 				std::string rowId = "##row_" + entry.name;
-				if (imgui->SelectableFull(rowId.c_str(), false, kRowSelectableFlags, 0.0f, 0.0f))
+				if (imgui->SelectableFull(rowId.c_str(), false, kRowSelectableFlags, 0.0f, kIconSize))
 				{
 					bool nowExpanded = !s_expandedRows[expandKey];
 					s_expandedRows[expandKey] = nowExpanded;
@@ -291,6 +291,7 @@ namespace ProductionUI
 
 				PluginImages::Image(imgui, GetHooks(), entry.iconId, kIconSize, kIconSize);
 				imgui->SameLine(0.0f, 4.0f);
+				imgui->AlignTextToFramePadding();
 				imgui->Text(entry.name.c_str());
 
 				imgui->TableNextColumn();
@@ -302,6 +303,7 @@ namespace ProductionUI
 
 				imgui->TableNextColumn();
 				std::string rateText = FormatAmount(entry.ratePerMinute) + "/m";
+				imgui->AlignTextToFramePadding();
 				imgui->Text(rateText.c_str());
 
 				// Per-base-core breakdown, toggled by clicking the row above.
