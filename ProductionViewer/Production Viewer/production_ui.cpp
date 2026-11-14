@@ -249,9 +249,10 @@ namespace ProductionUI
 			imgui->TableSetupColumn("Rate", kColumnFlagsWidthFixed, 60.0f);
 			imgui->TableHeadersRow();
 
-			constexpr float kIconSize = PluginImages::kMinSize;
+			// 28 px at the default font, growing with the font.
+			const float kIconSize = PluginImages::SizeForFont(imgui, PluginImages::kMinSize);
 			// As tall as the icon, so the graph shares the row's centre line.
-			constexpr float kGraphHeight = kIconSize;
+			const float kGraphHeight = kIconSize;
 
 			// ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap
 			constexpr int kRowSelectableFlags = (1 << 1) | (1 << 4);
