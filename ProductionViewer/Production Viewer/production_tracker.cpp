@@ -224,28 +224,10 @@ namespace ProductionTracker
 			return addr > 0x10000 && addr < 0x0000800000000000ULL;
 		}
 
-		// UFunction::NumParms (uint8) and ParmsSize (uint16): the parameter count and
-		// the byte size of the block ProcessEvent marshals. The SDK pads them
-		// (Pad_B4), so they are read from there. An engine layout, not a game one.
-		static_assert(offsetof(SDK::UFunction, Pad_B4) == 0xB4,
-			"UFunction layout changed: re-check where NumParms and ParmsSize are read");
-
-		uint8_t NumParmsOf(const SDK::UFunction* function)
-		{
-			return function->Pad_B4[0];
-		}
-
-		uint16_t ParmsSizeOf(const SDK::UFunction* function)
-		{
-			uint16_t size = 0;
-			std::memcpy(&size, &function->Pad_B4[2], sizeof(size));
-			return size;
-		}
-
 		// Calls UAuItemRecipeData::GetOutputItem and reads the item and its count off
 		// the FAuSimpleItem it returns. The game fills that struct, so the call gets
-		// a parameter block of the function's live ParmsSize (the return value is
-		// its only parameter, at offset 0) instead of a compiled FAuSimpleItem.
+		// a parameter block sized and laid out as the running game reflects the
+		// function (PluginMap::ParamsBlockOf) instead of a compiled FAuSimpleItem.
 		// False when the function or the item stack's size is not what this expects;
 		// the caller then skips the completion.
 		bool ReadOutputItem(SDK::UCrItemRecipeData* recipe, SDK::UAuItemDataBase*& outItem, int32_t& outCount)
@@ -253,28 +235,31 @@ namespace ProductionTracker
 			outItem = nullptr;
 			outCount = 0;
 
-			SDK::UFunction* function = SDK::UAuItemRecipeData::StaticClass()->GetFunction("AuItemRecipeData", "GetOutputItem");
-			const uint32_t parmsSize = function ? ParmsSizeOf(function) : 0;
-			if (!function || NumParmsOf(function) != 1 || parmsSize < ProductionViewerFields::ItemStackSize.resolvedSize)
+			// Resolved once: a UFunction lives as long as its class, which is why the
+			// SDK's own wrappers keep it in a static too.
+			static SDK::UFunction* s_function = SDK::UAuItemRecipeData::StaticClass()->GetFunction("AuItemRecipeData", "GetOutputItem");
+
+			PluginMap::ParamsBlock call = PluginMap::ParamsBlockOf(ProductionViewerFields::OutputItemParamsSize,
+				{ &ProductionViewerFields::OutputItemReturn });
+			if (!s_function || !call
+				|| ProductionViewerFields::OutputItemReturn.resolvedSize != ProductionViewerFields::ItemStackSize.resolvedSize)
 			{
 				static bool s_logged = false;
 				if (!s_logged)
 				{
 					s_logged = true;
-					LOG_WARN("ProductionTracker: GetOutputItem takes %u parameter(s) in 0x%X bytes, not one that holds an item stack (0x%X) - "
-						"output counting skipped.", function ? NumParmsOf(function) : 0, parmsSize,
-						ProductionViewerFields::ItemStackSize.resolvedSize);
+					LOG_WARN("ProductionTracker: GetOutputItem does not return an item stack of 0x%X bytes (return value 0x%X) - "
+						"output counting skipped.", static_cast<unsigned>(ProductionViewerFields::ItemStackSize.resolvedSize),
+						static_cast<unsigned>(ProductionViewerFields::OutputItemReturn.resolvedSize));
 				}
 				return false;
 			}
 
-			PluginMap::ParamsBlock call(parmsSize, { { "ReturnValue", 0, parmsSize } });
-
 			// Native flag set around the call, as the SDK's own wrappers do.
-			const auto flags = function->FunctionFlags;
-			function->FunctionFlags |= 0x400;
-			const bool called = PluginMap::Call(recipe, function, call);
-			function->FunctionFlags = flags;
+			const auto flags = s_function->FunctionFlags;
+			s_function->FunctionFlags |= 0x400;
+			const bool called = PluginMap::Call(recipe, s_function, call);
+			s_function->FunctionFlags = flags;
 			if (!called)
 				return false;
 
