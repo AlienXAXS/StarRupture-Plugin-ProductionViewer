@@ -92,11 +92,27 @@ Configurable via the ModLoader config UI / config file:
 
 ## Building
 
-1. Clone this repo (with submodules, or set `GameSDKRoot` / `PluginSDKInclude` in `Shared.props`)
-2. Open `StarRupture-Plugin-ProductionViewer.sln` in Visual Studio 2022
-3. Build the `Client Release` configuration (x64)
-4. The output DLL is written to `build\Client Release\Plugins\ProductionViewer.dll`
-5. Drop it into `Binaries\Win64\Plugins\` alongside `dwmapi.dll` and launch the game
+Put the plugin next to `StarRupture-Plugin-SDK` and clone both with `--recursive`, so the game SDK submodules come along:
+
+```
+git clone --recursive https://github.com/AlienXAXS/StarRupture-Plugin-SDK.git
+git clone --recursive https://github.com/AlienXAXS/StarRupture-Plugin-ProductionViewer.git
+```
+
+```
+<parent folder>/
+├── StarRupture-Plugin-SDK/
+└── StarRupture-Plugin-ProductionViewer/
+```
+
+The game SDK comes from this plugin's own `StarRupture SDK` submodule when it has one, otherwise from the Plugin SDK's. To build against other folders, pass `/p:PluginSDKInclude=...` and `/p:GameSDKRoot=...` to msbuild.
+
+Then:
+
+1. Open `StarRupture-Plugin-ProductionViewer.sln` in Visual Studio 2022
+2. Build the `Client Release` configuration (x64)
+3. The output DLL is written to `build\Client Release\Plugins\ProductionViewer.dll`
+4. Drop it into `Binaries\Win64\Plugins\` alongside `dwmapi.dll` and launch the game
 
 For dedicated servers, build `Server Release` instead and drop
 `build\Server Release\Plugins\ProductionViewer.dll` into the server's
