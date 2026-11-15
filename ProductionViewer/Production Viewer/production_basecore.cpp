@@ -40,12 +40,15 @@ namespace ProductionBaseCore
 		// Neither of these is a UFUNCTION, so the generated SDK has no callable
 		// wrapper - resolved by pattern scan and called directly (same approach
 		// as BetterMap's basecore_rename.h, where these patterns come from).
+		//
+		// The FCrMassEntityReplicationHelper is passed as raw memory: it lives in
+		// a PluginMap::StructBuffer of the size the running build reflects.
 		using ReplicationHelperCtorFn = void(__fastcall*)(
-			SDK::FCrMassEntityReplicationHelper* self, ProductionMass::FMassEntityHandle entity,
+			void* self, ProductionMass::FMassEntityHandle entity,
 			const SDK::UObject* worldContextObject);
 		using GetNameByReplicationHelperFn = SDK::FString*(__fastcall*)(
 			SDK::UCrBuildingCustomNameSubsystem* self, SDK::FString* result,
-			SDK::FCrMassEntityReplicationHelper* entity, bool* outIsDefaultName);
+			void* entity, bool* outIsDefaultName);
 
 		GetBaseCoresRangedBuildingFn g_getBaseCoresRangedBuilding = nullptr;
 		ReplicationHelperCtorFn      g_replicationHelperCtor      = nullptr;
@@ -120,8 +123,13 @@ namespace ProductionBaseCore
 				return kUnnamedBase;
 			}
 
-			SDK::FCrMassEntityReplicationHelper helper{};
-			g_replicationHelperCtor(&helper, handle, static_cast<const SDK::UObject*>(world));
+			PluginMap::StructBuffer helper(ProductionViewerFields::ReplicationHelperSize);
+			if (!helper)
+			{
+				LOG_DEBUG("ProductionBaseCore: ResolveBaseCoreName - replication helper size unresolved - using default name");
+				return kUnnamedBase;
+			}
+			g_replicationHelperCtor(helper.Data(), handle, static_cast<const SDK::UObject*>(world));
 			LOG_TRACE("ProductionBaseCore: ResolveBaseCoreName - handle Index=%u Serial=%u",
 				handle.Index, handle.SerialNumber);
 
@@ -130,7 +138,7 @@ namespace ProductionBaseCore
 			// lands in its cache for the next TTL refresh.
 			bool isDefaultName = true;
 			SDK::FString result{};
-			g_getNameByReplicationHelper(nameSys, &result, &helper, &isDefaultName);
+			g_getNameByReplicationHelper(nameSys, &result, helper.Data(), &isDefaultName);
 
 			std::string name = result.ToString();
 			LOG_DEBUG("ProductionBaseCore: ResolveBaseCoreName - Index=%u Serial=%u -> '%s' (isDefaultName=%d)",
@@ -170,12 +178,13 @@ namespace ProductionBaseCore
 			// FCrGridEntityHandle is { FMassEntityHandle EntityHandle;
 			// TSharedPtr<FCrGridEntityDataBase> Data; }. Only the entity handle
 			// matters to us; Data's controller is released below. The stride is
-			// the struct's size, checked against the running build.
-			auto* elements = static_cast<const SDK::FCrGridEntityHandle*>(out.Data);
+			// the struct's size on the running build.
 			for (int32_t i = 0; i < out.ArrayNum; ++i)
 			{
-				const uint64_t* handleBits = ProductionViewerFields::GridEntityHandle.In(&elements[i]);
-				const ProductionViewerFields::SharedRef* data = ProductionViewerFields::GridEntityData.In(&elements[i]);
+				const uint8_t* element = PluginMap::ElementAt(out.Data, out.ArrayNum, i,
+					ProductionViewerFields::GridEntityHandleSize);
+				const uint64_t* handleBits = ProductionViewerFields::GridEntityHandle.In(element);
+				const ProductionViewerFields::SharedRef* data = ProductionViewerFields::GridEntityData.In(element);
 				if (!handleBits)
 				{
 					if (data)

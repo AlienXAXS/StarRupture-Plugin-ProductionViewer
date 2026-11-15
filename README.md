@@ -39,6 +39,9 @@ two columns: **Production** and **Consumption**. Each column shows:
   Ammo and the blueprint items are tracked as separate items, each with its own icon.
   The old combined row from an earlier version is removed from saved sessions, so these
   items count again from zero.
+- **Game updates** -- the sizes of the base core query results, item stacks and the item name
+  helper come from the loader's version object map, so a game update that changes them
+  no longer breaks tracking.
 
 ### Multiplayer
 
