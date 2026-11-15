@@ -52,7 +52,7 @@ namespace ProductionTracker
 		};
 
 		std::mutex g_mutex;
-		std::map<std::string, ItemRecord> g_items; // key: UniqueItemName
+		std::map<std::string, ItemRecord> g_items; // key: ProductionViewerFields::ItemKeyOf
 		float g_saveTimer = 0.0f;
 
 		// The session file is only loaded once the session role is known: a
@@ -67,18 +67,17 @@ namespace ProductionTracker
 		{
 			if (!itemData)
 			{
-				outKey = "Unknown";
-				outDisplayName = "Unknown";
+				outKey = ProductionViewerFields::kUnknownItem;
+				outDisplayName = ProductionViewerFields::kUnknownItem;
 				return;
 			}
 
-			const SDK::FName* uniqueName = ProductionViewerFields::ItemUniqueName.In(itemData);
 			const SDK::FText* itemName = ProductionViewerFields::ItemName.In(itemData);
-			outKey = uniqueName ? uniqueName->ToString() : std::string();
+			outKey = ProductionViewerFields::ItemKeyOf(itemData);
 			outDisplayName = itemName ? SDK::UKismetTextLibrary::Conv_TextToString(*itemName).ToString() : std::string();
 
 			if (outKey.empty())
-				outKey = "Unknown";
+				outKey = ProductionViewerFields::kUnknownItem;
 			if (outDisplayName.empty())
 				outDisplayName = outKey;
 		}
@@ -191,6 +190,11 @@ namespace ProductionTracker
 			std::lock_guard<std::mutex> lock(g_mutex);
 			for (auto it = items.begin(); it != items.end(); ++it)
 			{
+				// Records saved under "None" before unnamed items had keys of their own
+				// hold several items added together; they are dropped and not saved again.
+				if (it.key() == ProductionViewerFields::kUnsetUniqueName)
+					continue;
+
 				ItemRecord& record = g_items[it.key()];
 				const nlohmann::json& entry = it.value();
 
@@ -312,7 +316,6 @@ namespace ProductionTracker
 
 		void OnEngineTick(float deltaSeconds)
 		{
-			ProductionIcons::Tick();
 			ProductionBaseCore::Tick(deltaSeconds);
 			ProductionWaypoint::Tick();
 			ProductionNet::Tick(deltaSeconds);
@@ -454,7 +457,7 @@ namespace ProductionTracker
 					entry.ratePerMinute = record.production.GetRatePerMinute(TimeRange::Minutes1);
 					entry.history = record.production.GetHistory(range);
 					entry.historyRatePerMinute = record.production.GetHistoryRatePerMinute(range);
-					entry.iconKey = key;
+					entry.iconId = ProductionIcons::IdOf(key);
 					entry.baseBreakdown = buildBreakdown(record.perBase, true);
 					items.production.push_back(std::move(entry));
 				}
@@ -467,7 +470,7 @@ namespace ProductionTracker
 					entry.ratePerMinute = record.consumption.GetRatePerMinute(TimeRange::Minutes1);
 					entry.history = record.consumption.GetHistory(range);
 					entry.historyRatePerMinute = record.consumption.GetHistoryRatePerMinute(range);
-					entry.iconKey = key;
+					entry.iconId = ProductionIcons::IdOf(key);
 					entry.baseBreakdown = buildBreakdown(record.perBase, false);
 					items.consumption.push_back(std::move(entry));
 				}

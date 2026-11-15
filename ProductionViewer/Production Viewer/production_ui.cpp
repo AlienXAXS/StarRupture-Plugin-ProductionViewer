@@ -1,6 +1,6 @@
 #include "production_ui.h"
 #include "production_data.h"
-#include "production_icons.h"
+#include "plugin_images.h"
 #include "production_tracker.h"
 #include "production_waypoint.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
@@ -249,9 +249,10 @@ namespace ProductionUI
 			imgui->TableSetupColumn("Rate", kColumnFlagsWidthFixed, 60.0f);
 			imgui->TableHeadersRow();
 
-			IPluginImGuiTextures* textures = GetHooks() ? GetHooks()->ImGuiTextures : nullptr;
-			constexpr float kIconSize = 20.0f;
-			constexpr float kGraphHeight = 20.0f;
+			// 28 px at the default font, growing with the font.
+			const float kIconSize = PluginImages::SizeForFont(imgui, PluginImages::kMinSize);
+			// As tall as the icon, so the graph shares the row's centre line.
+			const float kGraphHeight = kIconSize;
 
 			// ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap
 			constexpr int kRowSelectableFlags = (1 << 1) | (1 << 4);
@@ -270,7 +271,7 @@ namespace ProductionUI
 				// still render normally.
 				const std::string expandKey = std::string(tableId) + "/" + entry.name;
 				std::string rowId = "##row_" + entry.name;
-				if (imgui->SelectableFull(rowId.c_str(), false, kRowSelectableFlags, 0.0f, 0.0f))
+				if (imgui->SelectableFull(rowId.c_str(), false, kRowSelectableFlags, 0.0f, kIconSize))
 				{
 					bool nowExpanded = !s_expandedRows[expandKey];
 					s_expandedRows[expandKey] = nowExpanded;
@@ -290,7 +291,9 @@ namespace ProductionUI
 				}
 				imgui->SameLine(0.0f, 0.0f);
 
-				ProductionIcons::Draw(imgui, textures, entry.iconKey, kIconSize, 4.0f);
+				PluginImages::Image(imgui, GetHooks(), entry.iconId, kIconSize, kIconSize);
+				imgui->SameLine(0.0f, 4.0f);
+				imgui->AlignTextToFramePadding();
 				imgui->Text(entry.name.c_str());
 
 				imgui->TableNextColumn();
@@ -302,6 +305,7 @@ namespace ProductionUI
 
 				imgui->TableNextColumn();
 				std::string rateText = FormatAmount(entry.ratePerMinute) + "/m";
+				imgui->AlignTextToFramePadding();
 				imgui->Text(rateText.c_str());
 
 				// Per-base-core breakdown, toggled by clicking the row above.

@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <iterator>
+#include <string>
 #include <vector>
 
 // Every member of a game class the production viewer reads, taken from the
@@ -27,7 +28,6 @@ namespace ProductionViewerFields
 {
 	inline auto ItemUniqueName = PRODUCTIONVIEWER_FIELD(UAuItemDataBase, UniqueItemName);
 	inline auto ItemName       = PRODUCTIONVIEWER_FIELD(UAuItemDataBase, ItemName);
-	inline auto ItemIcon       = PRODUCTIONVIEWER_FIELD(UAuItemDataBase, ItemIcon);
 
 	inline auto CraftingSelectedRecipe = PRODUCTIONVIEWER_FIELD(FCrCraftingFragment, SelectedRecipe);
 	inline auto CraftingCurrentRecipe  = PRODUCTIONVIEWER_FIELD(FCrCraftingFragment, CurrentRecipe);
@@ -90,6 +90,29 @@ namespace ProductionViewerFields
 	using PluginMap::KeysOf;
 	using PluginMap::ValueOr;
 
+	// What an item with no unique name carries in UniqueItemName.
+	inline constexpr const char* kUnsetUniqueName = "None";
+
+	// The key of a record whose item could not be read.
+	inline constexpr const char* kUnknownItem = "Unknown";
+
+	// The key for an item: its unique name, or its asset name (the class name
+	// without the trailing "_C") where the unique name is empty or unset. Ammo
+	// and the blueprint items have none, and the asset name tells them apart.
+	// It is the same for the default object and for an instance.
+	inline std::string ItemKeyOf(const SDK::UAuItemDataBase* item)
+	{
+		const SDK::FName* name = ItemUniqueName.In(static_cast<const void*>(item));
+		std::string key = name ? name->ToString() : std::string();
+		if (!key.empty() && key != kUnsetUniqueName)
+			return key;
+
+		key = item && item->Class ? item->Class->GetName() : std::string();
+		if (key.size() > 2 && key.compare(key.size() - 2, 2, "_C") == 0)
+			key.resize(key.size() - 2);
+		return key;
+	}
+
 	// The parts of the plugin that can be off while the rest runs. A key the
 	// loader cannot resolve on a game build turns off the part that needs it;
 	// the others carry on. A key two parts need is listed in both: base cores
@@ -110,7 +133,6 @@ namespace ProductionViewerFields
 			"UCrBuildingCustomNameSubsystem::GetBuildingCustomNameByReplicationHelper",
 			ReplicationHelperSize, GridEntityHandle, GridEntityData, GridEntityHandleSize,
 			PluginMap::MassEntityManagerField, TransformFragmentTransform, TransformTranslation), {} };
-	inline PluginMap::Feature ItemIcons{ "icons", "Item icons", KeysOf(ItemIcon, ItemUniqueName), {} };
 	inline PluginMap::Feature SessionSave{ "sessionsave", "Keeping totals for each saved game",
 		KeysOf(ServerSessionName), {} };
 
@@ -118,7 +140,7 @@ namespace ProductionViewerFields
 	// lands on a feature and not on the plugin.
 	inline void DeclareFeatures(IPluginSelf* self, IPluginHookScanner* scanner)
 	{
-		PluginMap::DeclareFeatures(scanner, self, Tracking, BaseCores, ItemIcons, SessionSave);
+		PluginMap::DeclareFeatures(scanner, self, Tracking, BaseCores, SessionSave);
 	}
 
 	// Asks the loader for every row above. False when any did not resolve; the
@@ -126,7 +148,7 @@ namespace ProductionViewerFields
 	inline bool Resolve(IPluginSelf* self, IPluginHookScanner* scanner)
 	{
 		bool all = PluginMap::ResolveFields(scanner, self,
-			ItemUniqueName, ItemName, ItemIcon,
+			ItemUniqueName, ItemName,
 			CraftingSelectedRecipe, CraftingCurrentRecipe, CraftingMultiplier,
 			ItemStackData, ItemStackCount, ItemStackSize, ReplicationHelperSize,
 			TransformFragmentTransform, GridEntityHandleSize);
