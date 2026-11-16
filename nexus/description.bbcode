@@ -32,7 +32,8 @@ Open the dashboard at any time using the configured hotkey (default: [b]P[/b]) t
 [*]Search and filter items by name[/*]
 [*]Hover items to highlight them on the graph[/*]
 [*]Per-item totals and production rates per minute[/*]
-[*]Built-in item icons for easier identification, copied the first time they are shown rather than all at launch[/*]
+[*]Item icons for easier identification, supplied by the loader's image library. A row keeps its place while its icon loads. Ammo and the blueprint items are tracked as separate items, each with its own icon. The old combined row from an earlier version is removed from saved sessions, so these items count again from zero. Item pictures are drawn bigger and sharper than before[/*]
+[*]Keeps working when a game update changes the size of the base core query results, item stacks or the item name helper. The loader now supplies those sizes[/*]
 [/list]
 [b]Time Ranges[/b]
 
@@ -57,6 +58,12 @@ This allows long-term production totals to persist between play sessions.
 
 Short-term history windows (5s, 1m, 10m, and 1h) are intentionally reset each time the game starts.
 [/b]
+[line]
+
+[size=5][b]Requires[/b][/size]
+
+[url=https://www.nexusmods.com/starrupture/mods/89]AlienX's Mod Loader[/url], ModLoader 1.24.0 or newer. Item icons come from that loader's image library.
+
 [line]
 [b]
 [size=5][b]Installation[/b][/size]
