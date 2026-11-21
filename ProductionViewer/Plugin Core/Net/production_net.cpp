@@ -194,6 +194,15 @@ namespace ProductionNet
 			g_waitReason.store(static_cast<uint8_t>(reason), std::memory_order_relaxed);
 		}
 
+		// The queued requests hold raw player pointers, so they are dropped on
+		// every tick that cannot answer them instead of being kept for a later
+		// one. A client asks again on its next hello.
+		void DropSnapshotRequests()
+		{
+			std::lock_guard<std::mutex> lock(g_snapshotMutex);
+			g_snapshotRequests.clear();
+		}
+
 		// ---- Authority: outgoing -------------------------------------------
 
 		struct ItemDefOut
@@ -895,10 +904,7 @@ namespace ProductionNet
 				hooks->Network->UnregisterClientReadyCallback(self, &OnClientReady);
 			g_clientReadyRegistered = false;
 
-			{
-				std::lock_guard<std::mutex> lock(g_snapshotMutex);
-				g_snapshotRequests.clear();
-			}
+			DropSnapshotRequests();
 			g_serverReadySignal.store(false, std::memory_order_relaxed);
 
 			g_role.store(SessionRole::Unresolved, std::memory_order_relaxed);
@@ -910,7 +916,10 @@ namespace ProductionNet
 			// Counting turned off by the server: nothing is sent, not even the
 			// heartbeat or a join snapshot, until it is back on.
 			if (!ProductionViewerFields::Tracking.On())
+			{
+				DropSnapshotRequests();
 				return;
+			}
 
 			g_broadcastAccum += deltaSeconds;
 			g_sinceLastSend  += deltaSeconds;
@@ -959,7 +968,10 @@ namespace ProductionNet
 			// Counting turned off here: nothing is asked of the server and
 			// nothing it sends is applied, until it is back on.
 			if (!ProductionViewerFields::Tracking.On())
+			{
+				SetWaitReason(WaitReason::LinkStale);
 				return;
+			}
 
 			if (g_helloCooldown > 0.0f)
 				g_helloCooldown -= deltaSeconds;
@@ -1169,6 +1181,7 @@ namespace ProductionNet
 
 		if (role == SessionRole::Unresolved)
 		{
+			DropSnapshotRequests();
 			SetWaitReason(WaitReason::DetectingSession);
 			return;
 		}
