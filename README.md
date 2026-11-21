@@ -98,20 +98,22 @@ Configurable via the ModLoader config UI / config file:
 
 ## Building
 
-Put the plugin next to `StarRupture-Plugin-SDK` and clone both with `--recursive`, so the game SDK submodules come along:
+Put the plugin next to `StarRupture-Plugin-SDK` and `StarRupture-Game-SDK`:
 
 ```
-git clone --recursive https://github.com/AlienXAXS/StarRupture-Plugin-SDK.git
-git clone --recursive https://github.com/AlienXAXS/StarRupture-Plugin-ProductionViewer.git
+git clone https://github.com/AlienXAXS/StarRupture-Game-SDK.git
+git clone https://github.com/AlienXAXS/StarRupture-Plugin-SDK.git
+git clone https://github.com/AlienXAXS/StarRupture-Plugin-ProductionViewer.git
 ```
 
 ```
 <parent folder>/
+├── StarRupture-Game-SDK/
 ├── StarRupture-Plugin-SDK/
 └── StarRupture-Plugin-ProductionViewer/
 ```
 
-The game SDK comes from this plugin's own `StarRupture SDK` submodule when it has one, otherwise from the Plugin SDK's. To build against other folders, pass `/p:PluginSDKInclude=...` and `/p:GameSDKRoot=...` to msbuild.
+To build against other folders, pass `/p:PluginSDKInclude=...` and `/p:GameSDKRoot=...` to msbuild.
 
 Then:
 
