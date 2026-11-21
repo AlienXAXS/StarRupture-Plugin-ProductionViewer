@@ -72,6 +72,8 @@ sees the base's real lifetime figures rather than starting from zero.
 Clients also receive each base core's world position, so distances and the
 "Go" waypoint work for them the same as for the host.
 
+The Go overlay keeps showing the base's current name. A demolished base core is dropped from the list on its own within a few seconds, for clients on a server too, and the overlay closes. After you load a save or travel, the overlay finds the base again by its position. If it can't, it shows "Location lost." and closes after about a minute.
+
 > **Listen hosts:** the ModLoader's network channel can only send to clients
 > from a server build -- on a client build `SendPacketToAllClients` is a no-op.
 > A listen host therefore still shows its *own* data correctly, but cannot feed

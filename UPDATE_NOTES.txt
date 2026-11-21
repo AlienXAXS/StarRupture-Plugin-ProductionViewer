@@ -1,3 +1,7 @@
+- Fixed: a demolished base core is now dropped from the list within a few seconds. Clients on a server see it go too
+- The Go overlay keeps the base's current name, and closes when the base is demolished
+- The Go overlay finds its base again after loading a save or travelling. If it can't, it shows "Location lost." and closes after about a minute
+- Uses the version object map row for FMassEntityManager::IsEntityValid to check a base core still exists
 - Item icons now come from the loader's image library. A row keeps its place while its icon loads. This version needs ModLoader 1.25.0 or newer
 - Item pictures are bigger and sharper
 - Ammo and the blueprint items are now counted as separate items, each with its own icon. They used to be added together into one row with the Ammo icon. That old combined row is removed from saved sessions, so these items count again from zero
