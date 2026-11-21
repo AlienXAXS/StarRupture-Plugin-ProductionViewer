@@ -1,10 +1,12 @@
 #include "production_waypoint.h"
 #include "production_basecore.h"
+#include "production_tracker.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
 
 #include "Engine_classes.hpp"
 #include "plugin_map.h"
 
+#include <chrono>
 #include <cmath>
 #include <mutex>
 
@@ -24,13 +26,35 @@ namespace ProductionWaypoint
 		// already standing on.
 		constexpr float kAutoCloseDistanceMeters = 10.0f;
 
+		// After a world change the old key means nothing. The target is looked
+		// for again by position: base cores don't move, so the one within this
+		// distance of where it stood is the same base. If none shows up in this
+		// long, the overlay gives up.
+		constexpr double kRebindRadiusCm = 100.0;
+		constexpr double kSearchTimeoutSeconds = 60.0;
+
+		enum class TargetState : uint8_t
+		{
+			Tracking,    // the key resolves; the arrow points at it
+			Searching,   // world changed; looking for the base by position
+			Gone,        // base demolished or never found again; the render thread closes the overlay
+		};
+
 		IPluginSelf* g_self = nullptr;
 		WidgetHandle g_widget = nullptr;
 
+		// Everything below is guarded by g_mutex. Tick() resolves the target on
+		// the game thread and publishes the result here, so the render callback
+		// only reads plain data.
 		std::mutex g_mutex;
 		bool g_active = false;
+		uint32_t g_targetSerial = 0;   // bumped by SetTarget; a stale Tick result is dropped
 		uint64_t g_targetKey = 0;
-		std::string g_targetName;
+		std::string g_targetName;      // click-time name until the first live one arrives
+		TargetState g_state = TargetState::Tracking;
+		bool g_targetLocValid = false;
+		SDK::FVector g_targetLoc{};    // last known position of the base
+		std::chrono::steady_clock::time_point g_searchStart;
 
 		// The local player's pose, sampled by Tick() on the game thread. The
 		// render callback runs on the render thread, where UObjects must not
@@ -84,6 +108,9 @@ namespace ProductionWaypoint
 		{
 			uint64_t targetKey;
 			std::string targetName;
+			TargetState state;
+			bool targetLocValid;
+			SDK::FVector targetLoc;
 			bool poseValid;
 			SDK::FVector playerLoc;
 			double playerYaw;
@@ -93,9 +120,20 @@ namespace ProductionWaypoint
 					return;
 				targetKey = g_targetKey;
 				targetName = g_targetName;
+				state = g_state;
+				targetLocValid = g_targetLocValid;
+				targetLoc = g_targetLoc;
 				poseValid = g_poseValid;
 				playerLoc = g_playerLoc;
 				playerYaw = g_playerYaw;
+			}
+
+			if (state == TargetState::Gone)
+			{
+				LOG_DEBUG("ProductionWaypoint: render - base core Key=%llu is gone - closing",
+					static_cast<unsigned long long>(targetKey));
+				ClearTarget();
+				return;
 			}
 
 			imgui->SetWindowFontScale(1.15f);
@@ -112,6 +150,12 @@ namespace ProductionWaypoint
 
 			imgui->Separator();
 
+			if (state == TargetState::Searching)
+			{
+				imgui->TextDisabled("Location lost.");
+				return;
+			}
+
 			if (!poseValid)
 			{
 				imgui->TextDisabled("Player unavailable.");
@@ -119,15 +163,8 @@ namespace ProductionWaypoint
 				return;
 			}
 
-			SDK::FVector targetLoc{};
-			if (!ProductionBaseCore::GetBaseCoreLocation(targetKey, targetLoc))
-			{
-				imgui->TextDisabled("Location lost.");
-				LOG_DEBUG("ProductionWaypoint: render - base core Key=%llu has no cached location - closing",
-					static_cast<unsigned long long>(targetKey));
-				ClearTarget();
+			if (!targetLocValid)
 				return;
-			}
 
 			const double dx = targetLoc.X - playerLoc.X;
 			const double dy = targetLoc.Y - playerLoc.Y;
@@ -205,13 +242,101 @@ namespace ProductionWaypoint
 		g_self = nullptr;
 	}
 
+	// Resolves the target for this tick: its position (rebinding by position
+	// after a world change) and its current name. Game thread; the result is
+	// published for the render callback by the caller.
+	static void ResolveTarget(uint64_t& key, TargetState& state, bool& locValid, SDK::FVector& loc,
+		std::chrono::steady_clock::time_point searchStart, std::string& label)
+	{
+		if (state == TargetState::Searching)
+		{
+			uint64_t foundKey = 0;
+			SDK::FVector foundLoc{};
+			if (locValid && ProductionBaseCore::FindBaseNear(loc, kRebindRadiusCm, foundKey)
+				&& ProductionBaseCore::GetBaseCoreLocation(foundKey, foundLoc))
+			{
+				LOG_DEBUG("ProductionWaypoint: rebound Key=%llu -> Key=%llu after the world change",
+					static_cast<unsigned long long>(key), static_cast<unsigned long long>(foundKey));
+				key = foundKey;
+				loc = foundLoc;
+				state = TargetState::Tracking;
+			}
+			else
+			{
+				const std::chrono::duration<double> waited = std::chrono::steady_clock::now() - searchStart;
+				if (waited.count() >= kSearchTimeoutSeconds)
+				{
+					LOG_DEBUG("ProductionWaypoint: no base within %.0f cm of the old location after %.0f s - giving up",
+						kRebindRadiusCm, kSearchTimeoutSeconds);
+					state = TargetState::Gone;
+				}
+				return;
+			}
+		}
+		else
+		{
+			SDK::FVector current{};
+			if (ProductionBaseCore::GetBaseCoreLocation(key, current))
+			{
+				loc = current;
+				locValid = true;
+			}
+			else
+			{
+				state = TargetState::Gone;
+				return;
+			}
+		}
+
+		// The name follows renames: this process's own read when it resolves
+		// base cores itself, the server's announcement on a client.
+		std::string name;
+		if (ProductionBaseCore::GetBaseName(key, name) || ProductionTracker::GetRemoteBaseName(key, name))
+			label = std::move(name);
+	}
+
+	void OnSessionLoaded()
+	{
+		std::lock_guard<std::mutex> lock(g_mutex);
+		if (!g_active)
+			return;
+
+		// Handles from the old world are meaningless; keep the last position and
+		// look for the base there once the new world's locations arrive.
+		if (g_targetLocValid)
+		{
+			g_state = TargetState::Searching;
+			g_searchStart = std::chrono::steady_clock::now();
+		}
+		else
+			g_state = TargetState::Gone;
+	}
+
 	void Tick()
 	{
+		uint32_t serial;
+		uint64_t key;
+		TargetState state;
+		bool locValid;
+		SDK::FVector targetLoc;
+		std::string label;
+		std::chrono::steady_clock::time_point searchStart;
 		{
 			std::lock_guard<std::mutex> lock(g_mutex);
 			if (!g_active)
 				return;
+			serial = g_targetSerial;
+			key = g_targetKey;
+			state = g_state;
+			locValid = g_targetLocValid;
+			targetLoc = g_targetLoc;
+			label = g_targetName;
+			searchStart = g_searchStart;
 		}
+
+		const TargetState readState = state;
+		if (state != TargetState::Gone)
+			ResolveTarget(key, state, locValid, targetLoc, searchStart, label);
 
 		SDK::UWorld* world = PluginSdkRuntime::GetWorld();
 		SDK::APawn* pawn = world ? SDK::UGameplayStatics::GetPlayerPawn(world, 0) : nullptr;
@@ -230,15 +355,37 @@ namespace ProductionWaypoint
 		g_poseValid = valid;
 		g_playerLoc = loc;
 		g_playerYaw = yaw;
+
+		// SetTarget may have replaced the target while this tick resolved the
+		// old one.
+		// A world change landing in the same window (state no longer what was
+		// read) takes precedence too.
+		if (g_active && g_targetSerial == serial && g_state == readState)
+		{
+			g_targetKey = key;
+			g_state = state;
+			g_targetLocValid = locValid;
+			g_targetLoc = targetLoc;
+			g_targetName = std::move(label);
+		}
 	}
 
 	void SetTarget(uint64_t baseKey, const std::string& baseName)
 	{
+		// The row that was clicked has a cached location, so the first frame
+		// already has something to point at.
+		SDK::FVector loc{};
+		const bool locValid = ProductionBaseCore::GetBaseCoreLocation(baseKey, loc);
+
 		{
 			std::lock_guard<std::mutex> lock(g_mutex);
 			g_active = true;
+			++g_targetSerial;
 			g_targetKey = baseKey;
 			g_targetName = baseName;
+			g_state = TargetState::Tracking;
+			g_targetLocValid = locValid;
+			g_targetLoc = loc;
 		}
 
 		LOG_DEBUG("ProductionWaypoint: SetTarget - now navigating to '%s' (Key=%llu)",

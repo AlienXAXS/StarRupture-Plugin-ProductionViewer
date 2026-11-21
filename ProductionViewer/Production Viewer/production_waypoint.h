@@ -18,9 +18,16 @@ namespace ProductionWaypoint
 	// Unregisters the widget. Call from PluginShutdown.
 	void Shutdown(IPluginSelf* self);
 
-	// Samples the local player's position and facing for the overlay. Call
-	// every tick from the game thread: the render callback cannot read UObjects.
+	// Samples the local player's position and facing for the overlay, and
+	// resolves the target's current position and name. Call every tick from the
+	// game thread: the render callback cannot read UObjects.
 	void Tick();
+
+	// A world was loaded: the target's key no longer means anything. The overlay
+	// keeps its last position and looks for the base within 100 cm of it,
+	// showing "Location lost." and closing after about a minute if none shows up.
+	// Call after ProductionBaseCore::OnSessionLoaded.
+	void OnSessionLoaded();
 
 	// Starts navigating to the given base core (key from
 	// ProductionBaseCore::PackHandle) and shows the overlay. Replaces any

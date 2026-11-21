@@ -77,6 +77,11 @@ namespace ProductionBaseCore
 	// resolved. Safe to call from the UI/render path - only reads cached data.
 	bool GetBaseCoreLocation(uint64_t baseKey, SDK::FVector& outLocation);
 
+	// The cached base core nearest to a position, within radiusCm. Safe to call
+	// from any thread - only reads cached data. Base cores don't move, so this is
+	// how a base is found again after its handle stopped being valid.
+	bool FindBaseNear(const SDK::FVector& position, double radiusCm, uint64_t& outKey);
+
 	// Records a location the server reported for a base core, rather than one
 	// this process resolved. A multiplayer client never runs QueryBaseCores -
 	// it has no craft completions to trigger it, and the Mass entity handle in
