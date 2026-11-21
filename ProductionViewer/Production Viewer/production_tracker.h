@@ -46,6 +46,10 @@ namespace ProductionTracker
 	// production data so "All Time" totals continue from where they left off.
 	void OnSessionLoaded();
 
+	// Called when the world ends: saves this session's data while its role is
+	// still known, then lets the next world resolve its own role.
+	void OnSessionEnded();
+
 	// Snapshot of tracked items for the given time range.
 	const ProductionData::Category& GetItemsCategory(ProductionData::TimeRange range);
 

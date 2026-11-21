@@ -64,6 +64,14 @@ static void OnExperienceLoadComplete()
 	ProductionTracker::OnSessionLoaded();
 }
 
+// The world is going away: save its data, then forget its session role so the
+// next world (the main menu in between included) is not read as this one.
+static void OnWorldEndPlay(SDK::UWorld* world, const char* worldName)
+{
+	if (worldName && strcmp(worldName, "ChimeraMain") == 0)
+		ProductionTracker::OnSessionEnded();
+}
+
 extern "C" {
 
 	__declspec(dllexport) PluginInfo* GetPluginInfo()
@@ -125,7 +133,10 @@ extern "C" {
 		ProductionIcons::Init(self);
 
 		if (self->hooks->World)
+		{
 			self->hooks->World->RegisterOnExperienceLoadComplete(&OnExperienceLoadComplete);
+			self->hooks->World->RegisterOnBeforeWorldEndPlay(&OnWorldEndPlay);
+		}
 
 		// Note: the join-time snapshot is NOT driven from a player-joined hook.
 		// ProductionNet::Init registers for client-ready instead, which is the
@@ -145,7 +156,10 @@ extern "C" {
 		LOG_INFO("Plugin shutting down...");
 
 		if (g_self && g_self->hooks->World)
+		{
 			g_self->hooks->World->UnregisterOnExperienceLoadComplete(&OnExperienceLoadComplete);
+			g_self->hooks->World->UnregisterOnBeforeWorldEndPlay(&OnWorldEndPlay);
+		}
 
 		ProductionNet::Shutdown(g_self);
 		ProductionTracker::Shutdown(g_self);

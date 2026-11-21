@@ -174,8 +174,11 @@ namespace ProductionTracker
 
 			// A client's totals belong to the server's world, not to whatever
 			// local save the session name happens to resolve to - writing them
-			// out would quietly overwrite the player's own history.
-			if (ProductionNet::IsRemoteClient())
+			// out would quietly overwrite the player's own history. Before the
+			// role resolves (and between worlds) nothing vouches for what is
+			// held either.
+			const ProductionNet::SessionRole role = ProductionNet::GetRole();
+			if (role == ProductionNet::SessionRole::Unresolved || role == ProductionNet::SessionRole::RemoteClient)
 				return;
 
 			ProductionViewer::Storage::Set("items", BuildSaveData());
@@ -446,6 +449,14 @@ namespace ProductionTracker
 		// Clients are told to drop what they hold; the restore itself waits for
 		// the session role (see ServiceDeferredSessionLoad).
 		ProductionNet::OnSessionLoaded();
+	}
+
+	void OnSessionEnded()
+	{
+		// Before the role goes: a solo or host session is saved under its own
+		// role, and is not written again once the role is gone.
+		SaveToSession();
+		ProductionNet::OnSessionEnded();
 	}
 
 	const Category& GetItemsCategory(TimeRange range)

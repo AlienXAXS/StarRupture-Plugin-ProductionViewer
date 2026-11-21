@@ -82,6 +82,11 @@ namespace ProductionNet
 		// already ready.
 		bool g_clientReadyRegistered = false;
 
+		// True from a ChimeraMain world loading until it ends. The tick runs at the
+		// main menu too, where the net mode reads Standalone, so the role is only
+		// resolved while a game world is up.
+		std::atomic<bool> g_worldActive{ false };
+
 		// ---- Authority side ----------------------------------------------
 
 		// Guards the dictionaries and the pending buffer. OnLocalSample can be
@@ -865,6 +870,21 @@ namespace ProductionNet
 			LOG_INFO("ProductionNet: serving production data to clients");
 		}
 
+		// Back to "not resolved yet", so the next tick asks the net mode again. The
+		// role belongs to one world: a client that played solo and then joins a
+		// server must not carry Solo across, and a host must not carry Client.
+		void ResetSession()
+		{
+			IPluginSelf* self = GetSelf();
+			IPluginHooks* hooks = GetHooks();
+			if (g_clientReadyRegistered && self && hooks && hooks->Network)
+				hooks->Network->UnregisterClientReadyCallback(self, &OnClientReady);
+			g_clientReadyRegistered = false;
+
+			g_role.store(SessionRole::Unresolved, std::memory_order_relaxed);
+			SetWaitReason(WaitReason::DetectingSession);
+		}
+
 		void TickAuthority(float deltaSeconds)
 		{
 			g_broadcastAccum += deltaSeconds;
@@ -1075,6 +1095,15 @@ namespace ProductionNet
 			reset.generation    = g_generation;
 			Broadcast(reset);
 		}
+
+		ResetSession();
+		g_worldActive.store(true, std::memory_order_relaxed);
+	}
+
+	void OnSessionEnded()
+	{
+		g_worldActive.store(false, std::memory_order_relaxed);
+		ResetSession();
 	}
 
 	void Tick(float deltaSeconds)
@@ -1088,7 +1117,7 @@ namespace ProductionNet
 		// Net mode only resolves once an actor exists, so keep asking rather
 		// than assuming a role and tracking (or hiding) the wrong thing.
 		SessionRole role = g_role.load(std::memory_order_relaxed);
-		if (role == SessionRole::Unresolved && hooks->NetMode)
+		if (role == SessionRole::Unresolved && g_worldActive.load(std::memory_order_relaxed) && hooks->NetMode)
 		{
 			const SessionRole resolved = RoleFromNetMode(hooks->NetMode->GetNetMode());
 			if (resolved != SessionRole::Unresolved)

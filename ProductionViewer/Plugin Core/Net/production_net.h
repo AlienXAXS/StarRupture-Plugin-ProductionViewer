@@ -77,6 +77,10 @@ namespace ProductionNet
 	// Call when a save (re)loads.
 	void OnSessionLoaded();
 
+	// Forgets the session role when the world ends, so the next world resolves
+	// it again. Call after anything that still needs the role has run.
+	void OnSessionEnded();
+
 	// Game-thread tick, driven from ProductionTracker's engine tick. Resolves
 	// the session role, broadcasts on the configured interval, and ages out
 	// client-side data.
