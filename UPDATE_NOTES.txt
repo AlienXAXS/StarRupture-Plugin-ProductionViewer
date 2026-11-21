@@ -1,3 +1,5 @@
+- Server host rules (not active yet, needs a mod loader release with host rules): a host will be able to switch off counting, the split by base and Go, saving with the session, or item icons for the whole server. A part that is off stops drawing, sending, applying and writing
+- New: item icons can be switched off by a server host. Clients see "No update from the server recently." while the host has counting off
 - Fixed: a demolished base core is now dropped from the list within a few seconds. Clients on a server see it go too
 - The Go overlay keeps the base's current name, and closes when the base is demolished
 - A renamed base shows its new name on the Go overlay within a few seconds, for clients on a server too
