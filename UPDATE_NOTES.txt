@@ -5,5 +5,5 @@
 - Dedicated server: reads its game values from the version object map when the mod loader has rows for that server build, the same as the client; otherwise it finds those values itself, as before
 - Dedicated server: "Counting what factories craft" and "Splitting production by base" work again on a server build the loader has no rows for. The pattern that finds the fragment pointer call now matches the server's game files too
 - Dedicated server: the plugin keeps the right world after a map change
-- Fixed: joining a dedicated server from the main menu showed only your own production, not the server's. Hosting a game from the main menu now shares production with the players who join, too
+- Fixed: joining a dedicated server from the main menu showed only your own production, not the server's
 - Building: plain Debug and Release build the Client configuration, and the game build number comes from the SDK headers instead of a fixed value
