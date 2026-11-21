@@ -21,10 +21,12 @@ namespace ProductionMass
 		using SignalEntityFn       = void (__fastcall*)(SDK::UMassSignalSubsystem*, SDK::FName, FMassEntityHandle);
 
 		using GetMassEntitySubsystemFn = void* (__fastcall*)(SDK::UWorld*);
+		using IsEntityValidFn          = bool (__fastcall*)(const void* entityManager, FMassEntityHandle entity);
 
 		StaticStructFn       g_craftingFragmentStaticStruct = nullptr;
 		GetFragmentDataPtrFn g_getFragmentDataPtr = nullptr;
 		GetMassEntitySubsystemFn g_getMassEntitySubsystem = nullptr;
+		IsEntityValidFn      g_isEntityValid = nullptr;
 		SignalEntityFn       g_originalSignalEntity = nullptr;
 		HookHandle           g_signalEntityHook = nullptr;
 		CraftingCompleteCallback g_callback = nullptr;
@@ -184,6 +186,16 @@ namespace ProductionMass
 			return false;
 		}
 
+		// InternalGetFragmentDataPtr does not compare the serial in a Shipping
+		// build, so a handle whose entity was demolished (its index recycled, or
+		// its slot freed) must be refused here, before the fragment is read.
+		if (g_isEntityValid && !g_isEntityValid(entityManager, entity))
+		{
+			LOG_DEBUG("ProductionMass: GetEntityLocation - entity Index=%u Serial=%u is no longer valid",
+				entity.Index, entity.SerialNumber);
+			return false;
+		}
+
 		// FTransformFragment is a stock engine Mass fragment, so its
 		// UScriptStruct is reachable through reflection - unlike
 		// FCrCraftingFragment, whose StaticStruct had to be AOB-resolved.
@@ -237,6 +249,19 @@ namespace ProductionMass
 			return;
 
 		g_signalEntityAddr = ResolveSignalEntity(self, scanner);
+
+		// The loader's map row only (no pattern of our own). A build without the
+		// row leaves the check off, and nothing re-reads a cached handle there.
+		g_isEntityValid = reinterpret_cast<IsEntityValidFn>(PluginMap::Function(scanner, self,
+			"FMassEntityManager::IsEntityValid", nullptr, PLUGIN_SCAN_FUNCTION_START, PLUGIN_SCAN_FLAG_OPTIONAL));
+		if (!g_isEntityValid)
+			LOG_WARN("ProductionMass: FMassEntityManager::IsEntityValid unresolved - "
+				"demolished base cores will not be dropped from Go");
+	}
+
+	bool CanCheckEntities()
+	{
+		return g_isEntityValid != nullptr;
 	}
 
 	bool Init(IPluginSelf* self, CraftingCompleteCallback callback)
@@ -285,6 +310,7 @@ namespace ProductionMass
 		}
 
 		g_originalSignalEntity = nullptr;
+		g_isEntityValid = nullptr;
 		g_callback = nullptr;
 	}
 }

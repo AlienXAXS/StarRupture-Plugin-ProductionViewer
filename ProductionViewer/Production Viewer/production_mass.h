@@ -52,10 +52,16 @@ namespace ProductionMass
 	// Removes the SignalEntity hook installed by Init.
 	void Shutdown(IPluginSelf* self);
 
+	// True when the loader's map gave this build the entity validity check, so a
+	// cached handle can be re-read and a demolished entity refused. Without it,
+	// only a handle the game just returned may be passed to GetEntityLocation.
+	bool CanCheckEntities();
+
 	// Reads `entity`'s world-space location from its FTransformFragment via the
 	// same FMassEntityManager accessor the crafting hook uses - works for any
 	// Mass entity (loaded or de-spawned) that carries a transform, without ever
-	// touching an AActor. Returns false if the accessors aren't resolved, the
+	// touching an AActor. Refuses a handle whose entity no longer exists (the
+	// serial differs or the slot is free) when CanCheckEntities(). Returns false if the accessors aren't resolved, the
 	// entity has no transform fragment, or the world/entity manager is gone.
 	// Must be called on the game thread.
 	bool GetEntityLocation(SDK::UWorld* world, FMassEntityHandle entity, SDK::FVector& outLocation);
