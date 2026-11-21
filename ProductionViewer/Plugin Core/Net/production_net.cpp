@@ -881,6 +881,12 @@ namespace ProductionNet
 				hooks->Network->UnregisterClientReadyCallback(self, &OnClientReady);
 			g_clientReadyRegistered = false;
 
+			{
+				std::lock_guard<std::mutex> lock(g_snapshotMutex);
+				g_snapshotRequests.clear();
+			}
+			g_serverReadySignal.store(false, std::memory_order_relaxed);
+
 			g_role.store(SessionRole::Unresolved, std::memory_order_relaxed);
 			SetWaitReason(WaitReason::DetectingSession);
 		}
@@ -1086,9 +1092,17 @@ namespace ProductionNet
 		g_helloCooldown = 0.0f;
 		g_haveServerData.store(false, std::memory_order_relaxed);
 
-		// The world this data described is gone; tell clients before they draw
-		// another frame of it.
-		if (RoleHasAuthority(g_role.load(std::memory_order_relaxed)))
+		ResetSession();
+		g_worldActive.store(true, std::memory_order_relaxed);
+	}
+
+	void OnSessionEnded()
+	{
+		// The world this data described is going away; tell clients before they
+		// draw another frame of it. The net is still up at this point. Solo has
+		// nobody to tell.
+		const SessionRole role = g_role.load(std::memory_order_relaxed);
+		if (role == SessionRole::ListenHost || role == SessionRole::DedicatedServer)
 		{
 			PvResetPacket reset{};
 			reset.schemaVersion = kSchemaVersion;
@@ -1096,12 +1110,6 @@ namespace ProductionNet
 			Broadcast(reset);
 		}
 
-		ResetSession();
-		g_worldActive.store(true, std::memory_order_relaxed);
-	}
-
-	void OnSessionEnded()
-	{
 		g_worldActive.store(false, std::memory_order_relaxed);
 		ResetSession();
 	}

@@ -73,12 +73,13 @@ namespace ProductionNet
 	void Init(IPluginSelf* self);
 	void Shutdown(IPluginSelf* self);
 
-	// Drops per-session state and, on the server, tells clients to do the same.
-	// Call when a save (re)loads.
+	// Drops per-session state and forgets the session role, so the next tick
+	// resolves it again. Call when a save (re)loads.
 	void OnSessionLoaded();
 
-	// Forgets the session role when the world ends, so the next world resolves
-	// it again. Call after anything that still needs the role has run.
+	// When the world ends: on a server, tells clients to drop their data, then
+	// forgets the session role so the next world resolves it again. Call after
+	// anything that still needs the role has run.
 	void OnSessionEnded();
 
 	// Game-thread tick, driven from ProductionTracker's engine tick. Resolves
