@@ -2,6 +2,7 @@
 #include "Helpers/plugin_helpers.h"
 #include "Config/plugin_config.h"
 #include "Net/production_net.h"
+#include "Net/production_packets.h"
 #include "Storage/production_storage.h"
 #include "Production Viewer/production_ui.h"
 #include "Production Viewer/production_tracker.h"
@@ -44,6 +45,11 @@ static PluginInfo s_pluginInfo = {
 	PLUGIN_MAP_MIGRATED
 };
 
+// Wire id = the packet schema constant (see RuptureTimer for the reasoning).
+// "0.19.0" is the released build, which declares nothing.
+static_assert(ProductionNet::kSchemaVersion != 0, "wire id 0 means 'no wire id'");
+static const PluginWireInfo s_wireInfo = { ProductionNet::kSchemaVersion, "0.19.0" };
+
 // Fires once a save is fully loaded into the world — (re)load this session's
 // production data so "All Time" totals continue from where they left off.
 static void OnExperienceLoadComplete()
@@ -77,6 +83,11 @@ extern "C" {
 	__declspec(dllexport) PluginInfo* GetPluginInfo()
 	{
 		return &s_pluginInfo;
+	}
+
+	__declspec(dllexport) const PluginWireInfo* GetPluginWireInfo()
+	{
+		return &s_wireInfo;
 	}
 
 	// Runs after GetPluginInfo and before PluginInit, and is the only context in
