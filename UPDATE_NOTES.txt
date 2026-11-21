@@ -1,5 +1,7 @@
 - Fixed: a demolished base core is now dropped from the list within a few seconds. Clients on a server see it go too
 - The Go overlay keeps the base's current name, and closes when the base is demolished
+- A renamed base shows its new name on the Go overlay within a few seconds, for clients on a server too
+- The Go arrow turns with the camera, so it points the right way in the drone and in vehicles. Distances over 1000 m show in km
 - The Go overlay finds its base again after loading a save or travelling. If it can't, it shows "Location lost." and closes after about a minute
 - Uses the version object map row for FMassEntityManager::IsEntityValid to check a base core still exists
 - Item icons now come from the loader's image library. A row keeps its place while its icon loads. This version needs ModLoader 1.25.0 or newer
