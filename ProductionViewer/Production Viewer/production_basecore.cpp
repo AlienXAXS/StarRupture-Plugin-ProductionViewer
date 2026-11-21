@@ -2,6 +2,7 @@
 #include "Plugin Core/Helpers/plugin_helpers.h"
 #include "Plugin Core/Signatures/plugin_signatures.h"
 #include "production_fields.h"
+#include "Plugin Core/Net/production_net.h"
 
 #include "Basic.hpp"
 #include "CoreUObject_classes.hpp"
@@ -74,6 +75,14 @@ namespace ProductionBaseCore
 		SDK::FVector g_playerLocation{};
 		bool  g_playerLocationValid = false;
 		float g_playerRefreshTimer  = 0.0f;
+
+		// The latest name this process read for each base core, kept so Go can
+		// show a rename without a craft; and the keys the sweep dropped that the
+		// network layer has not been told about yet.
+		std::unordered_map<uint64_t, std::string> g_baseNames; // key: packed base core handle
+		std::vector<uint64_t> g_lostBases;
+		float g_sweepTimer = 0.0f;
+		constexpr float kSweepIntervalSeconds = 5.0f;
 
 		// Releases one strong reference on a returned FCrGridEntityHandle's
 		// TSharedPtr controller, mirroring the exact epilogue the game's own
@@ -227,6 +236,7 @@ namespace ProductionBaseCore
 						info.handle.Index, info.handle.SerialNumber, location.X, location.Y, location.Z);
 					std::lock_guard<std::mutex> lock(g_mutex);
 					g_baseLocations[PackHandle(info.handle)] = location;
+					g_baseNames[PackHandle(info.handle)] = info.name;
 				}
 				else
 				{
@@ -314,6 +324,8 @@ namespace ProductionBaseCore
 		std::lock_guard<std::mutex> lock(g_mutex);
 		g_buildingBases.clear();
 		g_baseLocations.clear();
+		g_baseNames.clear();
+		g_lostBases.clear();
 		g_playerLocationValid = false;
 	}
 
@@ -322,6 +334,8 @@ namespace ProductionBaseCore
 		std::lock_guard<std::mutex> lock(g_mutex);
 		g_buildingBases.clear();
 		g_baseLocations.clear();
+		g_baseNames.clear();
+		g_lostBases.clear();
 		g_playerLocationValid = false;
 	}
 
@@ -353,8 +367,84 @@ namespace ProductionBaseCore
 		return bases;
 	}
 
+	// Game thread. Re-reads the location of every cached base core and drops the
+	// ones whose entity is gone, so Go and the panel stop pointing at a base
+	// that was demolished. Only the process that resolved the handles itself may
+	// do this: a client's keys belong to the server's Mass world.
+	static void SweepLostBases(float deltaSeconds)
+	{
+		g_sweepTimer += deltaSeconds;
+		if (g_sweepTimer < kSweepIntervalSeconds)
+			return;
+		g_sweepTimer = 0.0f;
+
+		if (ProductionNet::IsRemoteClient() || !ProductionMass::CanCheckEntities())
+			return;
+
+		SDK::UWorld* world = PluginSdkRuntime::GetWorld();
+		if (!world)
+			return;
+
+		std::vector<uint64_t> keys;
+		{
+			std::lock_guard<std::mutex> lock(g_mutex);
+			keys.reserve(g_baseLocations.size());
+			for (const auto& entry : g_baseLocations)
+				keys.push_back(entry.first);
+		}
+
+		std::vector<uint64_t> lost;
+		for (uint64_t key : keys)
+		{
+			const ProductionMass::FMassEntityHandle handle{
+				static_cast<uint32_t>(key & 0xFFFFFFFFu), static_cast<uint32_t>(key >> 32) };
+			SDK::FVector location{};
+			if (!ProductionMass::GetEntityLocation(world, handle, location))
+				lost.push_back(key);
+		}
+
+		if (lost.empty())
+			return;
+
+		std::lock_guard<std::mutex> lock(g_mutex);
+		for (uint64_t key : lost)
+		{
+			g_baseLocations.erase(key);
+			g_baseNames.erase(key);
+			g_lostBases.push_back(key);
+		}
+		LOG_DEBUG("ProductionBaseCore: sweep dropped %zu demolished base core(s)", lost.size());
+	}
+
+	std::vector<uint64_t> TakeLostBases()
+	{
+		std::lock_guard<std::mutex> lock(g_mutex);
+		std::vector<uint64_t> out;
+		out.swap(g_lostBases);
+		return out;
+	}
+
+	bool GetBaseName(uint64_t baseKey, std::string& outName)
+	{
+		std::lock_guard<std::mutex> lock(g_mutex);
+		auto it = g_baseNames.find(baseKey);
+		if (it == g_baseNames.end())
+			return false;
+
+		outName = it->second;
+		return true;
+	}
+
+	void ClearRemoteBaseLocation(uint64_t baseKey)
+	{
+		std::lock_guard<std::mutex> lock(g_mutex);
+		g_baseLocations.erase(baseKey);
+	}
+
 	void Tick(float deltaSeconds)
 	{
+		SweepLostBases(deltaSeconds);
+
 		// The cached player location exists only to label base cores with a
 		// distance in the panel. A server build has no panel and no local
 		// player, so this would be a ProcessEvent call every second for a

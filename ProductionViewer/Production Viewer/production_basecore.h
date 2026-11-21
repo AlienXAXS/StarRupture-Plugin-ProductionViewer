@@ -84,4 +84,14 @@ namespace ProductionBaseCore
 	// distances and the "Go" waypoint work for a client. Takes plain floats so
 	// the network layer needs no SDK types.
 	void SetRemoteBaseLocation(uint64_t baseKey, float x, float y, float z);
+
+	// Forgets a location the server reported, when it reports the base gone.
+	void ClearRemoteBaseLocation(uint64_t baseKey);
+
+	// Base cores the sweep in Tick found demolished since the last call, for the
+	// network layer to announce. Authority only; always empty on a client.
+	std::vector<uint64_t> TakeLostBases();
+
+	// The latest name this process read for the base core, false if none.
+	bool GetBaseName(uint64_t baseKey, std::string& outName);
 }
