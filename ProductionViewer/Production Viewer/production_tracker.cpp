@@ -104,6 +104,11 @@ namespace ProductionTracker
 				sample.key = baseKey;
 				sample.name = baseName;
 
+				// The name that came with a cached query can be a minute old;
+				// the sweep keeps this one current, so a rename is not undone.
+				if (baseKey != 0)
+					ProductionBaseCore::GetBaseName(baseKey, sample.name);
+
 				SDK::FVector location{};
 				if (baseKey != 0 && ProductionBaseCore::GetBaseCoreLocation(baseKey, location))
 				{
@@ -375,7 +380,20 @@ namespace ProductionTracker
 			for (uint64_t lostKey : ProductionBaseCore::TakeLostBases())
 				ProductionNet::OnBaseLost(lostKey);
 			for (const auto& [renamedKey, newName] : ProductionBaseCore::TakeRenamedBases())
+			{
 				ProductionNet::OnBaseRenamed(renamedKey, newName);
+
+				// The breakdown rows and every full sync read the name from
+				// these records, which a craft only refreshes from a cached
+				// name, so the new name goes in here too.
+				std::lock_guard<std::mutex> lock(g_mutex);
+				for (auto& [itemKey, record] : g_items)
+				{
+					auto it = record.perBase.find(renamedKey);
+					if (it != record.perBase.end())
+						it->second.baseName = newName;
+				}
+			}
 			ProductionWaypoint::Tick();
 			ProductionNet::Tick(deltaSeconds);
 			ServiceDeferredSessionLoad();

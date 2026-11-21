@@ -151,7 +151,7 @@ namespace ProductionBaseCore
 			g_getNameByReplicationHelper(nameSys, &result, helper.Data(), &isDefaultName);
 
 			std::string name = result.ToString();
-			LOG_DEBUG("ProductionBaseCore: ResolveBaseCoreName - Index=%u Serial=%u -> '%s' (isDefaultName=%d)",
+			LOG_TRACE("ProductionBaseCore: ResolveBaseCoreName - Index=%u Serial=%u -> '%s' (isDefaultName=%d)",
 				handle.Index, handle.SerialNumber, name.c_str(), isDefaultName ? 1 : 0);
 
 			if (name.empty() || isDefaultName)
@@ -375,7 +375,9 @@ namespace ProductionBaseCore
 	// that was demolished. The ones still standing get their name read again, so
 	// a rename shows without waiting for the next craft. Only the process that
 	// resolved the handles itself may do this: a client's keys belong to the
-	// server's Mass world.
+	// server's Mass world, so it waits until the role is known to be one that
+	// has authority (a client's role is Unresolved until the net mode answers,
+	// and it can already hold the server's keys by then).
 	static void SweepBases(float deltaSeconds)
 	{
 		g_sweepTimer += deltaSeconds;
@@ -383,7 +385,8 @@ namespace ProductionBaseCore
 			return;
 		g_sweepTimer = 0.0f;
 
-		if (!ProductionViewerFields::BaseCores.On() || ProductionNet::IsRemoteClient()
+		if (!ProductionViewerFields::BaseCores.On()
+			|| !ProductionNet::RoleHasAuthority(ProductionNet::GetRole())
 			|| !ProductionMass::CanCheckEntities())
 			return;
 
@@ -427,6 +430,11 @@ namespace ProductionBaseCore
 		{
 			auto it = g_baseNames.find(key);
 			if (it == g_baseNames.end() || it->second == name)
+				continue;
+
+			// A read that fell back to the placeholder (no name subsystem yet,
+			// or a client's name still arriving) is not a rename.
+			if (name == kUnnamedBase)
 				continue;
 
 			LOG_DEBUG("ProductionBaseCore: sweep saw a base core renamed '%s' -> '%s'", it->second.c_str(), name.c_str());
