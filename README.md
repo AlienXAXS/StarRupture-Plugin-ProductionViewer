@@ -72,7 +72,7 @@ sees the base's real lifetime figures rather than starting from zero.
 Clients also receive each base core's world position, so distances and the
 "Go" waypoint work for them the same as for the host.
 
-The Go overlay keeps showing the base's current name, and a rename shows within a few seconds. Its arrow turns with where the camera looks (in the drone or a vehicle too), and a distance over 1000 m is shown in km. A demolished base core is dropped from the list on its own within a few seconds, for clients on a server too, and the overlay closes. After you load a save or travel, the overlay finds the base again by its position. If it can't, it shows "Location lost." and closes after about a minute.
+The Go overlay keeps showing the base's current name, and a rename shows within a few seconds. Its arrow turns with where the camera looks (in the drone or a vehicle too), and a distance over 1000 m is shown in km. When a base core is demolished, its row in the breakdown stays but loses its distance within a few seconds, for clients on a server too, and the overlay closes. After you load a save or travel, the overlay finds the base again by its position. If it can't, it shows "Location lost." and closes after about a minute.
 
 > **Listen hosts:** the ModLoader's network channel can only send to clients
 > from a server build -- on a client build `SendPacketToAllClients` is a no-op.
