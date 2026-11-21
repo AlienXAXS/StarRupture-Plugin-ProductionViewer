@@ -8,7 +8,9 @@
 // Drives a small moveable overlay window that points the player toward a
 // base core they picked from the item breakdown (ProductionUI's "Go"
 // button). Rendered via IPluginUIEvents::RegisterWidget so it stays visible
-// even while the main Production Viewer panel is closed.
+// even while the main Production Viewer panel is closed. The arrow, distance
+// and pose sampling come from the SDK's waypoint helper; this module only
+// finds the base core again each tick.
 namespace ProductionWaypoint
 {
 	// Registers the overlay widget. Call once from PluginInit, after
@@ -18,9 +20,9 @@ namespace ProductionWaypoint
 	// Unregisters the widget. Call from PluginShutdown.
 	void Shutdown(IPluginSelf* self);
 
-	// Samples the local player's position and facing for the overlay, and
-	// resolves the target's current position and name. Call every tick from the
-	// game thread: the render callback cannot read UObjects.
+	// Resolves the target's current position and name and samples the camera
+	// and the local player for the overlay. Call every tick from the game
+	// thread: the render callback cannot read UObjects.
 	void Tick();
 
 	// A world was loaded: the target's key no longer means anything. The overlay
@@ -33,7 +35,4 @@ namespace ProductionWaypoint
 	// ProductionBaseCore::PackHandle) and shows the overlay. Replaces any
 	// previously active target.
 	void SetTarget(uint64_t baseKey, const std::string& baseName);
-
-	// Stops navigating and hides the overlay, if active.
-	void ClearTarget();
 }
