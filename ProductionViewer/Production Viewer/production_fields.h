@@ -145,12 +145,15 @@ namespace ProductionViewerFields
 			PluginMap::MassEntityManagerField, TransformFragmentTransform, TransformTranslation), {} };
 	inline PluginMap::Feature SessionSave{ "sessionsave", "Keeping totals for each saved game",
 		KeysOf(ServerSessionName), {} };
+	// Item pictures come from the loader's image library, which has no map key
+	// of its own, so only a server rule can turn this one off.
+	inline PluginMap::Feature Icons{ "icons", "Item icons", {}, {} };
 
 	// Call before Resolve and ProductionTracker::ResolvePatterns, so a miss
 	// lands on a feature and not on the plugin.
 	inline void DeclareFeatures(IPluginSelf* self, IPluginHookScanner* scanner)
 	{
-		PluginMap::DeclareFeatures(scanner, self, Tracking, BaseCores, SessionSave);
+		PluginMap::DeclareFeatures(scanner, self, Tracking, BaseCores, SessionSave, Icons);
 	}
 
 	// Asks the loader for every row above. False when any did not resolve; the

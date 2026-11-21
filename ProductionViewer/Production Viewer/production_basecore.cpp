@@ -383,7 +383,8 @@ namespace ProductionBaseCore
 			return;
 		g_sweepTimer = 0.0f;
 
-		if (ProductionNet::IsRemoteClient() || !ProductionMass::CanCheckEntities())
+		if (!ProductionViewerFields::BaseCores.On() || ProductionNet::IsRemoteClient()
+			|| !ProductionMass::CanCheckEntities())
 			return;
 
 		SDK::UWorld* world = PluginSdkRuntime::GetWorld();
@@ -477,7 +478,7 @@ namespace ProductionBaseCore
 		// number nothing reads - distances are computed on each client from
 		// its own pawn and the base location the server replicated.
 		IPluginHooks* hooks = GetHooks();
-		if (!hooks || !hooks->UI)
+		if (!hooks || !hooks->UI || !ProductionViewerFields::BaseCores.On())
 			return;
 
 		g_playerRefreshTimer += deltaSeconds;

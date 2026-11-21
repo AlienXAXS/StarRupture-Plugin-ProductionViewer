@@ -84,7 +84,9 @@ namespace ProductionMass
 			if (g_originalSignalEntity)
 				g_originalSignalEntity(self, signalName, entity);
 
-			if (!g_callback || !self)
+			// A server rule can turn counting off after the hook went in; the
+			// game's own call above has already run.
+			if (!g_callback || !self || !ProductionViewerFields::Tracking.On())
 				return;
 
 			if (signalName.ToString() != "CraftingItemComplete")

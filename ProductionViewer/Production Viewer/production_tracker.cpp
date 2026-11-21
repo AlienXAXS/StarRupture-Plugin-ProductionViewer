@@ -169,7 +169,7 @@ namespace ProductionTracker
 
 		void SaveToSession()
 		{
-			if (!ProductionViewer::Storage::IsLoaded())
+			if (!ProductionViewerFields::SessionSave.On() || !ProductionViewer::Storage::IsLoaded())
 				return;
 
 			// A client's totals belong to the server's world, not to whatever
@@ -187,6 +187,9 @@ namespace ProductionTracker
 
 		void LoadFromSession()
 		{
+			if (!ProductionViewerFields::SessionSave.On())
+				return;
+
 			nlohmann::json items = ProductionViewer::Storage::Get("items", nlohmann::json::object());
 			if (!items.is_object())
 				return;
@@ -471,6 +474,12 @@ namespace ProductionTracker
 		items = Category{};
 		items.name = "Items";
 
+		// Counting turned off by the server: nothing to draw.
+		if (!ProductionViewerFields::Tracking.On())
+			return items;
+
+		const bool splitByBase = ProductionViewerFields::BaseCores.On();
+
 		// Per-base breakdown for one direction (production or consumption) of
 		// an item, nearest base first, unknown distances last.
 		auto buildBreakdown = [range](const std::map<uint64_t, PerBaseRecord>& perBase, bool isProduction)
@@ -523,7 +532,8 @@ namespace ProductionTracker
 					entry.history = record.production.GetHistory(range);
 					entry.historyRatePerMinute = record.production.GetHistoryRatePerMinute(range);
 					entry.iconId = ProductionIcons::IdOf(key);
-					entry.baseBreakdown = buildBreakdown(record.perBase, true);
+					if (splitByBase)
+						entry.baseBreakdown = buildBreakdown(record.perBase, true);
 					items.production.push_back(std::move(entry));
 				}
 
@@ -536,7 +546,8 @@ namespace ProductionTracker
 					entry.history = record.consumption.GetHistory(range);
 					entry.historyRatePerMinute = record.consumption.GetHistoryRatePerMinute(range);
 					entry.iconId = ProductionIcons::IdOf(key);
-					entry.baseBreakdown = buildBreakdown(record.perBase, false);
+					if (splitByBase)
+						entry.baseBreakdown = buildBreakdown(record.perBase, false);
 					items.consumption.push_back(std::move(entry));
 				}
 			}
@@ -618,6 +629,9 @@ namespace ProductionTracker
 
 	void SetRemoteBaseLocation(uint64_t baseKey, float x, float y, float z)
 	{
+		if (!ProductionViewerFields::BaseCores.On())
+			return;
+
 		ProductionBaseCore::SetRemoteBaseLocation(baseKey, x, y, z);
 	}
 
@@ -634,6 +648,9 @@ namespace ProductionTracker
 	void SeedRemoteItem(const std::string& itemKey, const std::string& displayName,
 		float allTimeProduced, float allTimeConsumed, float allTimeElapsedSeconds)
 	{
+		if (!ProductionViewerFields::Tracking.On())
+			return;
+
 		std::lock_guard<std::mutex> lock(g_mutex);
 		ItemRecord& record = g_items[itemKey];
 		record.displayName = displayName;
@@ -643,6 +660,9 @@ namespace ProductionTracker
 
 	void ApplyRemoteItemDelta(const std::string& itemKey, float produced, float consumed)
 	{
+		if (!ProductionViewerFields::Tracking.On())
+			return;
+
 		std::lock_guard<std::mutex> lock(g_mutex);
 		auto it = g_items.find(itemKey);
 		if (it == g_items.end())
@@ -657,6 +677,9 @@ namespace ProductionTracker
 	void ApplyRemoteBaseDelta(const std::string& itemKey, uint64_t baseKey,
 		const std::string& baseName, float produced, float consumed)
 	{
+		if (!ProductionViewerFields::Tracking.On() || !ProductionViewerFields::BaseCores.On())
+			return;
+
 		std::lock_guard<std::mutex> lock(g_mutex);
 		auto it = g_items.find(itemKey);
 		if (it == g_items.end())
@@ -673,6 +696,9 @@ namespace ProductionTracker
 	void SeedRemoteBase(const std::string& itemKey, uint64_t baseKey,
 		const std::string& baseName, float allTimeProduced, float allTimeConsumed)
 	{
+		if (!ProductionViewerFields::Tracking.On() || !ProductionViewerFields::BaseCores.On())
+			return;
+
 		std::lock_guard<std::mutex> lock(g_mutex);
 		auto it = g_items.find(itemKey);
 		if (it == g_items.end())

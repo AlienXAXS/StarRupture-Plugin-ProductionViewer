@@ -1,6 +1,7 @@
 #include "production_waypoint.h"
 #include "production_basecore.h"
 #include "production_tracker.h"
+#include "production_fields.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
 
 #include "Engine_classes.hpp"
@@ -232,11 +233,22 @@ namespace ProductionWaypoint
 
 	void Tick()
 	{
+		// The base split turned off by the server: the overlay closes.
+		if (!ProductionViewerFields::BaseCores.On())
+		{
+			std::lock_guard<std::mutex> lock(g_mutex);
+			g_waypoint.Clear();
+			return;
+		}
+
 		g_waypoint.Tick(PluginSdkRuntime::GetWorld());
 	}
 
 	void SetTarget(uint64_t baseKey, const std::string& baseName)
 	{
+		if (!ProductionViewerFields::BaseCores.On())
+			return;
+
 		// The row that was clicked has a cached location, so a world change
 		// right after the click still has a position to search from.
 		SDK::FVector loc{};

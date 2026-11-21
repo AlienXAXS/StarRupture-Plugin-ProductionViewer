@@ -15,7 +15,7 @@ namespace ProductionIcons
 	{
 		IPluginHooks* hooks = GetHooks();
 		IPluginSelf*  self  = GetSelf();
-		if (!hooks || !hooks->Images || !self)
+		if (!hooks || !hooks->Images || !self || !ProductionViewerFields::Icons.On())
 			return 0;
 
 		if (uniqueItemName.empty() || uniqueItemName == ProductionViewerFields::kUnknownItem)

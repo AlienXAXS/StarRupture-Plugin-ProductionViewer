@@ -3,6 +3,7 @@
 #include "Plugin Core/Helpers/plugin_helpers.h"
 #include "Plugin Core/Config/plugin_config.h"
 #include "Production Viewer/production_tracker.h"
+#include "Production Viewer/production_fields.h"
 
 #include "plugin_network_helpers.h"
 
@@ -273,6 +274,9 @@ namespace ProductionNet
 		template<typename SendFn>
 		void SendBaseDefs(const std::vector<BaseDefOut>& defs, SendFn&& send)
 		{
+			if (!ProductionViewerFields::BaseCores.On())
+				return;
+
 			for (size_t i = 0; i < defs.size(); i += kBaseDefsPerPacket)
 			{
 				PvBaseDefPacket packet{};
@@ -291,6 +295,9 @@ namespace ProductionNet
 		template<typename SendFn>
 		void SendBaseStats(const std::vector<PvBaseStatsPacket::Entry>& stats, SendFn&& send)
 		{
+			if (!ProductionViewerFields::BaseCores.On())
+				return;
+
 			for (size_t i = 0; i < stats.size(); i += kBaseStatsPerPacket)
 			{
 				PvBaseStatsPacket packet{};
@@ -340,7 +347,7 @@ namespace ProductionNet
 
 				for (auto& [baseKey, entry] : g_baseDict)
 				{
-					if (!entry.defDirty)
+					if (!entry.defDirty || !ProductionViewerFields::BaseCores.On())
 						continue;
 					baseDefs.push_back(BaseDefOut{ entry.id, baseKey, entry.name,
 						entry.hasLocation, entry.locX, entry.locY, entry.locZ });
@@ -371,6 +378,9 @@ namespace ProductionNet
 			{
 				if ((item.produced > 0.0f || item.consumed > 0.0f) && definedNow.count(itemKey) == 0)
 					entries.push_back(PvDeltaPacket::Entry{ item.id, kBaseIdItemTotal, item.produced, item.consumed });
+
+				if (!ProductionViewerFields::BaseCores.On())
+					continue;
 
 				for (const auto& [baseKey, base] : item.bases)
 					entries.push_back(PvDeltaPacket::Entry{ item.id, base.id, base.produced, base.consumed });
@@ -897,6 +907,11 @@ namespace ProductionNet
 
 		void TickAuthority(float deltaSeconds)
 		{
+			// Counting turned off by the server: nothing is sent, not even the
+			// heartbeat or a join snapshot, until it is back on.
+			if (!ProductionViewerFields::Tracking.On())
+				return;
+
 			g_broadcastAccum += deltaSeconds;
 			g_sinceLastSend  += deltaSeconds;
 			g_fullSyncAccum  += deltaSeconds;
@@ -941,6 +956,11 @@ namespace ProductionNet
 
 		void TickRemoteClient(float deltaSeconds)
 		{
+			// Counting turned off here: nothing is asked of the server and
+			// nothing it sends is applied, until it is back on.
+			if (!ProductionViewerFields::Tracking.On())
+				return;
+
 			if (g_helloCooldown > 0.0f)
 				g_helloCooldown -= deltaSeconds;
 
