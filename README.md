@@ -5,7 +5,9 @@ factories produce and consume, and shows it in a live, searchable dashboard.
 
 **Target:** Game client, plus a headless server build that feeds connected clients
 
-**Requires:** ModLoader 1.24.0 or newer ([StarRupture-ModLoader](https://github.com/AlienXAXS/StarRupture-ModLoader))
+**Requires:** ModLoader 1.25.0 or newer ([StarRupture-ModLoader](https://github.com/AlienXAXS/StarRupture-ModLoader))
+
+On a dedicated server, keep the mod loader up to date. It carries the version object map rows for each server build, and on a server build it has no rows for, the plugin uses its own patterns.
 
 ---
 
@@ -40,7 +42,7 @@ two columns: **Production** and **Consumption**. Each column shows:
   The old combined row from an earlier version is removed from saved sessions, so these
   items count again from zero.
 - **Game updates** -- the sizes of the base core query results, item stacks and the item name
-  helper come from the loader's version object map, so a game update that changes them
+  helper come from the loader's version map, so a game update that changes them
   no longer breaks tracking.
 
 ### Multiplayer
