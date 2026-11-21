@@ -2,3 +2,5 @@
 - Item pictures are bigger and sharper
 - Ammo and the blueprint items are now counted as separate items, each with its own icon. They used to be added together into one row with the Ammo icon. That old combined row is removed from saved sessions, so these items count again from zero
 - Keeps working if a game update changes the size of the base core query results, item stacks or the item name helper. The sizes now come from the loader's version object map
+- On a dedicated server, "Counting what factories craft" and "Splitting production by base" now work on a loader that has no server rows in its version object map yet; the server build finds the game function with its own pattern
+- Building: plain Debug and Release build the Client configuration, and the game build number comes from the SDK headers instead of a fixed value
