@@ -39,9 +39,20 @@ namespace Signatures
 	// call-site pattern WAILA uses: the AOB matches the call that fetches a
 	// fragment (the first E8, a StaticStruct getter) and the call after it is
 	// the function, so the rel32 at GetFragmentDataPtrFollowAt is followed.
+	//
+	// The dedicated-server binary compiles this call site with different
+	// registers and stack slots after the second call, so the server build
+	// carries its own pattern. It is the same call site, and the follow offset
+	// is the same.
+#if defined(MODLOADER_SERVER_BUILD)
+	inline constexpr const char* GetFragmentDataPtr =
+		"E8 ?? ?? ?? ?? 4C 8B C0 48 8B D3 48 8B CE E8 ?? ?? ?? ?? 48 85 C0 0F 84 ?? ?? ?? ?? "
+		"0F 10 48 20 66 41 0F 2F ?? 30 0F 10 40 30 0F 11";
+#else
 	inline constexpr const char* GetFragmentDataPtr =
 		"E8 ?? ?? ?? ?? 4C 8B C0 48 8B D3 48 8B CE E8 ?? ?? ?? ?? 48 85 C0 0F 84 ?? ?? ?? ?? "
 		"0F 10 48 20 66 41 0F 2F 4D 30 0F 10 40 30 0F 11 4D EF F2 0F 11 45 FF";
+#endif
 	inline constexpr int32_t GetFragmentDataPtrFollowAt = 0x0E;
 
 	// UMassSignalSubsystem::SignalEntity(UMassSignalSubsystem*, FName, FMassEntityHandle)
