@@ -81,6 +81,7 @@ namespace ProductionBaseCore
 		// network layer has not been told about yet.
 		std::unordered_map<uint64_t, std::string> g_baseNames; // key: packed base core handle
 		std::vector<uint64_t> g_lostBases;
+		std::vector<std::pair<uint64_t, std::string>> g_renamedBases;
 		float g_sweepTimer = 0.0f;
 		constexpr float kSweepIntervalSeconds = 5.0f;
 
@@ -326,6 +327,7 @@ namespace ProductionBaseCore
 		g_baseLocations.clear();
 		g_baseNames.clear();
 		g_lostBases.clear();
+		g_renamedBases.clear();
 		g_playerLocationValid = false;
 	}
 
@@ -336,6 +338,7 @@ namespace ProductionBaseCore
 		g_baseLocations.clear();
 		g_baseNames.clear();
 		g_lostBases.clear();
+		g_renamedBases.clear();
 		g_playerLocationValid = false;
 	}
 
@@ -369,9 +372,11 @@ namespace ProductionBaseCore
 
 	// Game thread. Re-reads the location of every cached base core and drops the
 	// ones whose entity is gone, so Go and the panel stop pointing at a base
-	// that was demolished. Only the process that resolved the handles itself may
-	// do this: a client's keys belong to the server's Mass world.
-	static void SweepLostBases(float deltaSeconds)
+	// that was demolished. The ones still standing get their name read again, so
+	// a rename shows without waiting for the next craft. Only the process that
+	// resolved the handles itself may do this: a client's keys belong to the
+	// server's Mass world.
+	static void SweepBases(float deltaSeconds)
 	{
 		g_sweepTimer += deltaSeconds;
 		if (g_sweepTimer < kSweepIntervalSeconds)
@@ -393,7 +398,9 @@ namespace ProductionBaseCore
 				keys.push_back(entry.first);
 		}
 
+		const bool canReadNames = g_replicationHelperCtor && g_getNameByReplicationHelper;
 		std::vector<uint64_t> lost;
+		std::vector<std::pair<uint64_t, std::string>> names;
 		for (uint64_t key : keys)
 		{
 			const ProductionMass::FMassEntityHandle handle{
@@ -401,10 +408,9 @@ namespace ProductionBaseCore
 			SDK::FVector location{};
 			if (!ProductionMass::GetEntityLocation(world, handle, location))
 				lost.push_back(key);
+			else if (canReadNames)
+				names.emplace_back(key, ResolveBaseCoreName(world, handle));
 		}
-
-		if (lost.empty())
-			return;
 
 		std::lock_guard<std::mutex> lock(g_mutex);
 		for (uint64_t key : lost)
@@ -413,7 +419,19 @@ namespace ProductionBaseCore
 			g_baseNames.erase(key);
 			g_lostBases.push_back(key);
 		}
-		LOG_DEBUG("ProductionBaseCore: sweep dropped %zu demolished base core(s)", lost.size());
+		if (!lost.empty())
+			LOG_DEBUG("ProductionBaseCore: sweep dropped %zu demolished base core(s)", lost.size());
+
+		for (auto& [key, name] : names)
+		{
+			auto it = g_baseNames.find(key);
+			if (it == g_baseNames.end() || it->second == name)
+				continue;
+
+			LOG_DEBUG("ProductionBaseCore: sweep saw a base core renamed '%s' -> '%s'", it->second.c_str(), name.c_str());
+			it->second = name;
+			g_renamedBases.emplace_back(key, std::move(name));
+		}
 	}
 
 	std::vector<uint64_t> TakeLostBases()
@@ -421,6 +439,14 @@ namespace ProductionBaseCore
 		std::lock_guard<std::mutex> lock(g_mutex);
 		std::vector<uint64_t> out;
 		out.swap(g_lostBases);
+		return out;
+	}
+
+	std::vector<std::pair<uint64_t, std::string>> TakeRenamedBases()
+	{
+		std::lock_guard<std::mutex> lock(g_mutex);
+		std::vector<std::pair<uint64_t, std::string>> out;
+		out.swap(g_renamedBases);
 		return out;
 	}
 
@@ -443,7 +469,7 @@ namespace ProductionBaseCore
 
 	void Tick(float deltaSeconds)
 	{
-		SweepLostBases(deltaSeconds);
+		SweepBases(deltaSeconds);
 
 		// The cached player location exists only to label base cores with a
 		// distance in the panel. A server build has no panel and no local

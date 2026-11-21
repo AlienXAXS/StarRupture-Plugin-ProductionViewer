@@ -116,6 +116,11 @@ namespace ProductionNet
 	// every full sync after it) and clients forget the position. Game thread.
 	void OnBaseLost(uint64_t baseKey);
 
+	// Authority: a base core was renamed, so the dictionary entry takes the new
+	// name and the def goes out again. A base no craft has reported yet has no
+	// entry, and is announced with its name when it first does. Game thread.
+	void OnBaseRenamed(uint64_t baseKey, const std::string& name);
+
 	// Server: push the full dictionary and current totals to one player, so a
 	// joining client doesn't sit on an empty panel until something gets crafted.
 	// Queued and sent on the next authority tick. Driven by the loader's

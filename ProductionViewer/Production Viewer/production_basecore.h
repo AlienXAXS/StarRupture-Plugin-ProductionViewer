@@ -97,6 +97,10 @@ namespace ProductionBaseCore
 	// network layer to announce. Authority only; always empty on a client.
 	std::vector<uint64_t> TakeLostBases();
 
+	// Base cores the sweep found renamed since the last call (key, new name), for
+	// the network layer to announce. Authority only; always empty on a client.
+	std::vector<std::pair<uint64_t, std::string>> TakeRenamedBases();
+
 	// The latest name this process read for the base core, false if none.
 	bool GetBaseName(uint64_t baseKey, std::string& outName);
 }

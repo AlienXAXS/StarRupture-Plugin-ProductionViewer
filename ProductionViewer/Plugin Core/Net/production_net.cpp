@@ -143,7 +143,8 @@ namespace ProductionNet
 		std::mutex         g_snapshotMutex;
 
 		// ---- Client side --------------------------------------------------
-		// Touched only from the game thread: the packet handlers and Tick.
+		// Touched only from the game thread: the packet handlers and Tick. The
+		// loader runs OnReceive handlers on the game thread, so no lock is needed.
 
 		std::unordered_map<uint16_t, std::string> g_remoteItemKeys;
 		struct RemoteBase { uint64_t key = 0; std::string name; };
@@ -1265,6 +1266,17 @@ namespace ProductionNet
 			return;
 
 		it->second.hasLocation = false;
+		it->second.defDirty = true;
+	}
+
+	void OnBaseRenamed(uint64_t baseKey, const std::string& name)
+	{
+		std::lock_guard<std::mutex> lock(g_authorityMutex);
+		auto it = g_baseDict.find(baseKey);
+		if (it == g_baseDict.end() || it->second.name == name)
+			return;
+
+		it->second.name = name;
 		it->second.defDirty = true;
 	}
 

@@ -371,6 +371,8 @@ namespace ProductionTracker
 			ProductionBaseCore::Tick(deltaSeconds);
 			for (uint64_t lostKey : ProductionBaseCore::TakeLostBases())
 				ProductionNet::OnBaseLost(lostKey);
+			for (const auto& [renamedKey, newName] : ProductionBaseCore::TakeRenamedBases())
+				ProductionNet::OnBaseRenamed(renamedKey, newName);
 			ProductionWaypoint::Tick();
 			ProductionNet::Tick(deltaSeconds);
 			ServiceDeferredSessionLoad();
