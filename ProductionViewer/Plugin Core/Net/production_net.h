@@ -111,12 +111,22 @@ namespace ProductionNet
 	void OnLocalSample(const std::string& itemKey, const std::string& displayName,
 		float amount, bool isProduction, const std::vector<BaseSample>& bases);
 
+	// Authority: a base core was demolished, so its location is no longer valid.
+	// The def goes out again with hasLocation cleared (incremental broadcast, and
+	// every full sync after it) and clients forget the position. Game thread.
+	void OnBaseLost(uint64_t baseKey);
+
 	// Server: push the full dictionary and current totals to one player, so a
 	// joining client doesn't sit on an empty panel until something gets crafted.
 	// Queued and sent on the next authority tick. Driven by the loader's
 	// client-ready callback, never by player-joined: a client is not reachable
 	// yet at PostLogin, and packets sent then are dropped, not buffered.
 	void SendSnapshotTo(void* playerController);
+
+	// Client: the name the server last announced for a base core, empty-handed
+	// (false) if none has arrived. Game thread only, like the packet handlers that
+	// write it.
+	bool GetRemoteBaseName(uint64_t baseKey, std::string& outName);
 
 	SessionRole GetRole();
 

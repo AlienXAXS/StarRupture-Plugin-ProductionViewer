@@ -369,6 +369,8 @@ namespace ProductionTracker
 		void OnEngineTick(float deltaSeconds)
 		{
 			ProductionBaseCore::Tick(deltaSeconds);
+			for (uint64_t lostKey : ProductionBaseCore::TakeLostBases())
+				ProductionNet::OnBaseLost(lostKey);
 			ProductionWaypoint::Tick();
 			ProductionNet::Tick(deltaSeconds);
 			ServiceDeferredSessionLoad();
@@ -445,6 +447,7 @@ namespace ProductionTracker
 
 		// Entity handles and cached locations don't survive a session change.
 		ProductionBaseCore::OnSessionLoaded();
+		ProductionWaypoint::OnSessionLoaded();
 
 		// Clients are told to drop what they hold; the restore itself waits for
 		// the session role (see ServiceDeferredSessionLoad).
@@ -614,6 +617,16 @@ namespace ProductionTracker
 	void SetRemoteBaseLocation(uint64_t baseKey, float x, float y, float z)
 	{
 		ProductionBaseCore::SetRemoteBaseLocation(baseKey, x, y, z);
+	}
+
+	void ClearRemoteBaseLocation(uint64_t baseKey)
+	{
+		ProductionBaseCore::ClearRemoteBaseLocation(baseKey);
+	}
+
+	bool GetRemoteBaseName(uint64_t baseKey, std::string& outName)
+	{
+		return ProductionNet::GetRemoteBaseName(baseKey, outName);
 	}
 
 	void SeedRemoteItem(const std::string& itemKey, const std::string& displayName,

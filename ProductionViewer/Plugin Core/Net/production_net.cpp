@@ -702,8 +702,11 @@ namespace ProductionNet
 				// The server's world position lets this client show distances
 				// and drive the "Go" waypoint. It cannot resolve the base core
 				// itself: Mass entity handles are local to one process.
+				// hasLocation cleared means the server's base core is gone.
 				if (entry.hasLocation && entry.baseKey != 0)
 					ProductionTracker::SetRemoteBaseLocation(entry.baseKey, entry.locX, entry.locY, entry.locZ);
+				else if (entry.baseKey != 0)
+					ProductionTracker::ClearRemoteBaseLocation(entry.baseKey);
 			}
 
 			MarkPacketReceived();
@@ -1254,6 +1257,17 @@ namespace ProductionNet
 		}
 	}
 
+	void OnBaseLost(uint64_t baseKey)
+	{
+		std::lock_guard<std::mutex> lock(g_authorityMutex);
+		auto it = g_baseDict.find(baseKey);
+		if (it == g_baseDict.end() || !it->second.hasLocation)
+			return;
+
+		it->second.hasLocation = false;
+		it->second.defDirty = true;
+	}
+
 	void SendSnapshotTo(void* playerController)
 	{
 		if (!playerController)
@@ -1264,6 +1278,19 @@ namespace ProductionNet
 			if (existing == playerController)
 				return;
 		g_snapshotRequests.push_back(playerController);
+	}
+
+	bool GetRemoteBaseName(uint64_t baseKey, std::string& outName)
+	{
+		for (const auto& [baseId, base] : g_remoteBases)
+		{
+			if (base.key == baseKey)
+			{
+				outName = base.name;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	SessionRole GetRole()
