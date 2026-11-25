@@ -5,7 +5,7 @@ factories produce and consume, and shows it in a live, searchable dashboard.
 
 **Target:** Game client, plus a headless server build that feeds connected clients
 
-**Requires:** ModLoader 1.25.0 or newer ([StarRupture-ModLoader](https://github.com/AlienXAXS/StarRupture-ModLoader))
+**Requires:** ModLoader 1.24.0 or newer ([StarRupture-ModLoader](https://github.com/AlienXAXS/StarRupture-ModLoader))
 
 On a dedicated server, keep the mod loader up to date. It carries the version object map rows for each server build, and on a server build it has no rows for, the plugin finds those values itself, as before.
 
