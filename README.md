@@ -139,21 +139,6 @@ See [PluginDevelopment.md](PluginDevelopment.md) for the full plugin API referen
 
 Found a bug? [Report it on GitHub](https://github.com/AlienXAXS/StarRupture-Plugin-ProductionViewer/issues) and attach your `ModLoader.log` (in `<game>\StarRupture\Binaries\Win64\ModLoader\Logs\`).
 
-## A server can switch parts off (not active yet)
-
-A server host will be able to switch parts of Production Viewer off for the whole server, and back on, without a restart. The parts are:
-
-- `tracking`: counting what factories craft. Off means nothing is counted, shown or sent.
-- `basecores`: the split by base and the Go waypoint. Off means item rows have no per-base breakdown and no Go button, and an open Go overlay closes. Totals keep counting.
-- `sessionsave`: saving and loading All Time totals with the save. Off means totals don't carry over and nothing is written to the session.
-- `icons`: item pictures. Off means rows are drawn without them.
-
-A part that is off stops drawing, sending, applying and writing. Nothing is written to the game, so there is nothing to undo. Turning it back on brings it back.
-
-On a client, switching `tracking` off shows "No update from the server recently." (or "Waiting for production data from the server...") instead of the tables.
-
-This is not active yet: it needs a mod loader release with host rules, which is not out. Until then nothing changes. With a mod loader that has it, the host runs `features hostoff ProductionViewer <id>` in the server console, for example `features hostoff ProductionViewer icons`, and `features hostclear` to lift it.
-
 ## Credits
 
 Original mod by [@AlienXAXS](https://github.com/AlienXAXS).
