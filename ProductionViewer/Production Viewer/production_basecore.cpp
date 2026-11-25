@@ -262,8 +262,8 @@ namespace ProductionBaseCore
 		if (!self || !scanner)
 			return false;
 
-		// Optional throughout: a miss costs base-core attribution but leaves the
-		// rest of the tracker working, which is what the old scan-at-init path did.
+		// A miss here turns off the split by base (the BaseCores feature) but leaves
+		// the rest of the tracker working.
 		//
 		// All three are called directly with a `this` pointer, so each declares
 		// FUNCTION_START -- calling into an address that merely looked right is
@@ -290,7 +290,7 @@ namespace ProductionBaseCore
 		}
 		else
 			LOG_WARN("ProductionBaseCore: FCrMassEntityReplicationHelper ctor unresolved - "
-				"base cores will show as '%s'", kUnnamedBase);
+				"splitting production by base is off");
 
 		uintptr_t nameAddr = ResolveFunction(self, scanner,
 			"UCrBuildingCustomNameSubsystem::GetBuildingCustomNameByReplicationHelper", PLUGIN_MAP_PATTERN(Signatures::GetBuildingCustomNameByReplicationHelper));
@@ -302,7 +302,7 @@ namespace ProductionBaseCore
 		}
 		else
 			LOG_WARN("ProductionBaseCore: GetBuildingCustomNameByReplicationHelper unresolved - "
-				"base cores will show as '%s'", kUnnamedBase);
+				"splitting production by base is off");
 
 		LOG_INFO("ProductionBaseCore: base core resolution ready (names %s)",
 			(g_replicationHelperCtor && g_getNameByReplicationHelper) ? "enabled" : "disabled");
