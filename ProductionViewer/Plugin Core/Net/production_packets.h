@@ -70,7 +70,7 @@ namespace ProductionNet
 	};
 
 	// Base core dictionary. The world location travels with it so a client can
-	// show distances and drive the "Go" waypoint without resolving the base core
+	// show distances without resolving the base core
 	// entity itself - Mass entity handles are local to one process and mean
 	// nothing on the other end of the wire.
 	struct PvBaseDefPacket

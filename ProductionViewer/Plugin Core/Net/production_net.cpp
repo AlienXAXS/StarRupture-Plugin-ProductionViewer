@@ -719,9 +719,8 @@ namespace ProductionNet
 				base.key  = entry.baseKey;
 				base.name = ReadFixed(entry.name, kBaseNameChars);
 
-				// The server's world position lets this client show distances
-				// and drive the "Go" waypoint. It cannot resolve the base core
-				// itself: Mass entity handles are local to one process.
+				// The server's world position lets this client show distances.
+				// It cannot resolve the base core itself: Mass entity handles are local to one process.
 				// hasLocation cleared means the server's base core is gone.
 				if (entry.hasLocation && entry.baseKey != 0)
 					ProductionTracker::SetRemoteBaseLocation(entry.baseKey, entry.locX, entry.locY, entry.locZ);

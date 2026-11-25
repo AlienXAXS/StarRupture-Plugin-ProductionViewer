@@ -29,6 +29,7 @@ namespace ProductionData
 	struct Entry
 	{
 		std::string name;
+		std::string itemKey;                        // UAuItemDataBase::UniqueItemName; set on production rows only (the Go button needs it)
 		float total;                                // total over the selected time range
 		float ratePerMinute;                        // current rate
 		std::array<float, kHistorySamples> history;            // sparkline data (raw bucket amounts), oldest -> newest

@@ -2,13 +2,13 @@
 #include "production_data.h"
 #include "plugin_images.h"
 #include "production_tracker.h"
-#include "production_waypoint.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
 #include "Plugin Core/Config/plugin_config.h"
 #include "Plugin Core/Net/production_net.h"
 
 #include "Engine_classes.hpp"
 #include "plugin_map.h"
+#include "plugin_go_to_item.h"
 
 #include <algorithm>
 #include <array>
@@ -345,13 +345,27 @@ namespace ProductionUI
 						imgui->TextDisabled(detailText.c_str());
 
 						// Only known, locatable base cores can be navigated to -
-						// "Unknown Location" (baseKey 0) has nothing to point at.
-						if (base.baseKey != 0 && base.distanceMeters >= 0.0f)
+						// "Unknown Location" (baseKey 0) has nothing to point at. The
+						// button hands the item and base to the Go to Item plugin, so it
+						// shows only while that plugin is loaded and only on production
+						// rows (itemKey is empty on consumption rows).
+						if (base.baseKey != 0 && base.distanceMeters >= 0.0f && !entry.itemKey.empty() && GoToItem::Get())
 						{
 							imgui->SameLine(0.0f, 8.0f);
-							std::string goId = "Go##waypoint_" + std::to_string(base.baseKey);
+							std::string goId = "Go##goto_" + std::to_string(base.baseKey);
 							if (imgui->SmallButton(goId.c_str()))
-								ProductionWaypoint::SetTarget(base.baseKey, base.baseName);
+							{
+								if (const GoToItemApi* api = GoToItem::Get())
+								{
+									if (api->TrackItem(entry.itemKey.c_str()) >= GOTO_OK)
+										api->SelectSource(entry.itemKey.c_str(), base.baseKey);
+								}
+							}
+							if (imgui->IsItemHovered())
+							{
+								std::string goTip = "Tracks " + entry.name + " in Go to Item and points to " + base.baseName;
+								imgui->SetTooltip(goTip.c_str());
+							}
 						}
 
 						imgui->TableNextColumn();

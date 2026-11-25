@@ -3,7 +3,6 @@
 #include "production_icons.h"
 #include "production_mass.h"
 #include "production_basecore.h"
-#include "production_waypoint.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
 #include "production_fields.h"
 #include "Plugin Core/Net/production_net.h"
@@ -394,7 +393,6 @@ namespace ProductionTracker
 						it->second.baseName = newName;
 				}
 			}
-			ProductionWaypoint::Tick();
 			ProductionNet::Tick(deltaSeconds);
 			ServiceDeferredSessionLoad();
 
@@ -470,7 +468,6 @@ namespace ProductionTracker
 
 		// Entity handles and cached locations don't survive a session change.
 		ProductionBaseCore::OnSessionLoaded();
-		ProductionWaypoint::OnSessionLoaded();
 
 		// Clients are told to drop what they hold; the restore itself waits for
 		// the session role (see ServiceDeferredSessionLoad).
@@ -545,6 +542,7 @@ namespace ProductionTracker
 				{
 					Entry entry;
 					entry.name = record.displayName;
+					entry.itemKey = key;
 					entry.total = record.production.GetTotal(range);
 					entry.ratePerMinute = record.production.GetRatePerMinute(TimeRange::Minutes1);
 					entry.history = record.production.GetHistory(range);

@@ -97,8 +97,8 @@ namespace ProductionNet
 		uint64_t    key = 0;   // ProductionBaseCore::PackHandle; 0 = "Unknown Location"
 		std::string name;
 
-		// The base core's world location, so clients can show distances and
-		// drive the waypoint without resolving the entity themselves.
+		// The base core's world location, so clients can show distances
+		// without resolving the entity themselves.
 		bool  hasLocation = false;
 		float locX = 0.0f;
 		float locY = 0.0f;

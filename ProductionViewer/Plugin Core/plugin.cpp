@@ -7,7 +7,6 @@
 #include "Production Viewer/production_ui.h"
 #include "Production Viewer/production_tracker.h"
 #include "Production Viewer/production_icons.h"
-#include "Production Viewer/production_waypoint.h"
 #include "Production Viewer/production_fields.h"
 #include "Engine_classes.hpp"
 
@@ -39,7 +38,7 @@ static PluginInfo s_pluginInfo = {
 	MODLOADER_BUILD_TAG,
 	"AlienX",
 	"Displays production information",
-	PLUGIN_INTERFACE_VERSION,
+	PLUGIN_DECLARED_INTERFACE,
 	PLUGIN_TARGET_THIS,
 	PLUGIN_GAME_BUILT_CL,
 	PLUGIN_MAP_MIGRATED
@@ -133,10 +132,6 @@ extern "C" {
 		// Register the Production Viewer ImGui window
 		ProductionUI::Init(self);
 
-		// Register the "walk to this base" overlay, triggered from a base
-		// breakdown row's "Go" button
-		ProductionWaypoint::Init(self);
-
 		// Start tracking production/consumption via the crafting hook
 		ProductionTracker::Init(self);
 
@@ -174,7 +169,6 @@ extern "C" {
 
 		ProductionNet::Shutdown(g_self);
 		ProductionTracker::Shutdown(g_self);
-		ProductionWaypoint::Shutdown(g_self);
 		ProductionUI::Shutdown(g_self);
 		ProductionViewer::Storage::Shutdown();
 

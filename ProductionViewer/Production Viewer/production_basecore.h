@@ -86,7 +86,7 @@ namespace ProductionBaseCore
 	// this process resolved. A multiplayer client never runs QueryBaseCores -
 	// it has no craft completions to trigger it, and the Mass entity handle in
 	// baseKey belongs to the server's process anyway - so this is the only way
-	// distances and the "Go" waypoint work for a client. Takes plain floats so
+	// distances work for a client. Takes plain floats so
 	// the network layer needs no SDK types.
 	void SetRemoteBaseLocation(uint64_t baseKey, float x, float y, float z);
 
