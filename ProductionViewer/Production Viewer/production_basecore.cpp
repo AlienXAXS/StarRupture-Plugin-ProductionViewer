@@ -253,13 +253,6 @@ namespace ProductionBaseCore
 	static uintptr_t ResolveFunction(IPluginSelf* self, IPluginHookScanner* scanner,
 		const char* hookName, const char* pattern)
 	{
-		// A build with no pattern for this function yet - see plugin_signatures.h.
-		if (!pattern || !*pattern)
-		{
-			LOG_WARN("ProductionBaseCore: no pattern for %s in this build - skipping scan", hookName);
-			return 0;
-		}
-
 		return PluginMap::Function(scanner, self, hookName, pattern,
 			PLUGIN_SCAN_FUNCTION_START, PLUGIN_SCAN_FLAG_OPTIONAL);
 	}
@@ -276,7 +269,7 @@ namespace ProductionBaseCore
 		// FUNCTION_START -- calling into an address that merely looked right is
 		// the failure this check exists to stop.
 		uintptr_t queryAddr = ResolveFunction(self, scanner,
-			"UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding", Signatures::GetBaseCoresRangedBuilding);
+			"UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding", PLUGIN_MAP_PATTERN(Signatures::GetBaseCoresRangedBuilding));
 		if (!queryAddr)
 		{
 			LOG_WARN("ProductionBaseCore: UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding unresolved - "
@@ -288,7 +281,7 @@ namespace ProductionBaseCore
 			static_cast<unsigned long long>(queryAddr));
 
 		uintptr_t ctorAddr = ResolveFunction(self, scanner,
-			"FCrMassEntityReplicationHelper::FCrMassEntityReplicationHelper", Signatures::BaseCoreReplicationHelperCtor);
+			"FCrMassEntityReplicationHelper::FCrMassEntityReplicationHelper", PLUGIN_MAP_PATTERN(Signatures::BaseCoreReplicationHelperCtor));
 		if (ctorAddr)
 		{
 			g_replicationHelperCtor = reinterpret_cast<ReplicationHelperCtorFn>(ctorAddr);
@@ -300,7 +293,7 @@ namespace ProductionBaseCore
 				"base cores will show as '%s'", kUnnamedBase);
 
 		uintptr_t nameAddr = ResolveFunction(self, scanner,
-			"UCrBuildingCustomNameSubsystem::GetBuildingCustomNameByReplicationHelper", Signatures::GetBuildingCustomNameByReplicationHelper);
+			"UCrBuildingCustomNameSubsystem::GetBuildingCustomNameByReplicationHelper", PLUGIN_MAP_PATTERN(Signatures::GetBuildingCustomNameByReplicationHelper));
 		if (nameAddr)
 		{
 			g_getNameByReplicationHelper = reinterpret_cast<GetNameByReplicationHelperFn>(nameAddr);

@@ -2,25 +2,15 @@
 
 #include <cstdint>
 
-// Central registry of AOB patterns and fixed image-base RVAs used to locate
-// game engine functions/data at runtime. When a game update breaks one of
-// these, this is the only file that should need editing - assuming the
+// Central registry of the AOB patterns the plugin's version map keys come
+// from. A shipped build passes none of them (PLUGIN_MAP_PATTERN) and asks the
+// loader's version object map for each key. CI builds with SR_KEY_SOURCE_BUILD
+// to read the keys and their patterns from here, so when a game update breaks
+// one of these, this is the only file that should need editing - assuming the
 // underlying function's shape is unchanged, in which case the dependent
 // follow-call offsets (also listed here) may need recomputing too.
 namespace Signatures
 {
-	// ---- ProductionTracker (production_tracker.cpp) ----
-
-	// UCrCraftingComponent::GetCraftingFragment(UCrCraftingComponent*)
-	// Returns the live FCrCraftingFragment* holding CurrentRecipe/SelectedRecipe.
-	// Used as a fallback when ItemsToCraft has already been drained by the time
-	// OnCraftingFinished fires (mirrors WAILA's crafter_detector).
-	inline constexpr const char* GetCraftingFragment =
-		"48 89 5C 24 ?? 57 48 83 EC ?? 48 8B 99 ?? ?? ?? ?? ?? ?? ?? 48 8B B8 ?? ?? ?? ?? "
-		"E8 ?? ?? ?? ?? 80 3D ?? ?? ?? ?? ?? 48 89 44 24 ?? 74 ?? 48 85 C0 74 ?? 48 8B C8 "
-		"E8 ?? ?? ?? ?? 48 8D 54 24 ?? 48 8B CB FF D7 48 85 C0 74 ?? 48 8B C8 E8 ?? ?? ?? ?? "
-		"48 85 C0 75 ?? 33 C0 48 8B 5C 24 ?? 48 83 C4 ?? 5F C3 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 83 EC";
-
 	// ---- ProductionMass (production_mass.cpp) ----
 
 	// FCrCraftingFragment::StaticStruct() - the UScriptStruct that keys the
@@ -91,8 +81,7 @@ namespace Signatures
 	// The client and dedicated-server binaries compile this function
 	// differently, so each build carries its own pattern. The client one is
 	// still needed: a listen-server host or single-player game runs the client
-	// build and resolves names locally. nullptr = no pattern for that build;
-	// the scan is skipped and base cores show as "Unnamed Base".
+	// build and resolves names locally.
 #if defined(MODLOADER_SERVER_BUILD)
 	inline constexpr const char* GetBuildingCustomNameByReplicationHelper =
 		"48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 49 8B F9 49 8B D8 48 8B EA 48 8B F1 E8 ?? ?? ?? ?? ?? ?? ?? 4C 8D 44 24";

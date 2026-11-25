@@ -66,7 +66,7 @@ namespace ProductionMass
 		{
 			// FUNCTION_START: called with a UWorld* in RCX.
 			uintptr_t addr = PluginMap::Function(scanner, self, "UWorld::GetSubsystem<UMassEntitySubsystem>",
-				Signatures::GetMassEntitySubsystem, PLUGIN_SCAN_FUNCTION_START, PLUGIN_SCAN_FLAG_OPTIONAL);
+				PLUGIN_MAP_PATTERN(Signatures::GetMassEntitySubsystem), PLUGIN_SCAN_FUNCTION_START, PLUGIN_SCAN_FLAG_OPTIONAL);
 			if (!addr)
 			{
 				LOG_WARN("ProductionMass: UWorld::GetSubsystem<UMassEntitySubsystem> unresolved");
@@ -128,12 +128,12 @@ namespace ProductionMass
 		bool ResolveFragmentAccessors(IPluginSelf* self, IPluginHookScanner* scanner)
 		{
 			const uintptr_t staticStructAddr = PluginMap::Function(scanner, self, "FCrCraftingFragment::StaticStruct",
-				Signatures::CraftingFragmentStaticStruct, PLUGIN_SCAN_FUNCTION_START,
+				PLUGIN_MAP_PATTERN(Signatures::CraftingFragmentStaticStruct), PLUGIN_SCAN_FUNCTION_START,
 				PLUGIN_SCAN_FLAG_OPTIONAL | PLUGIN_SCAN_FLAG_FOLLOW_REL32, 0,
 				Signatures::CraftingFragmentStaticStructFollowAt);
 			const uintptr_t getFragmentDataPtrAddr = PluginMap::Function(scanner, self,
 				"FMassEntityManager::InternalGetFragmentDataPtr",
-				Signatures::GetFragmentDataPtr, PLUGIN_SCAN_FUNCTION_START,
+				PLUGIN_MAP_PATTERN(Signatures::GetFragmentDataPtr), PLUGIN_SCAN_FUNCTION_START,
 				PLUGIN_SCAN_FLAG_OPTIONAL | PLUGIN_SCAN_FLAG_FOLLOW_REL32, 0,
 				Signatures::GetFragmentDataPtrFollowAt);
 			if (!staticStructAddr || !getFragmentDataPtrAddr)
@@ -159,7 +159,7 @@ namespace ProductionMass
 		{
 			// FUNCTION_START: detoured.
 			uintptr_t addr = PluginMap::Function(scanner, self, "UMassSignalSubsystem::SignalEntity",
-				Signatures::MassSignalSubsystem_SignalEntity, PLUGIN_SCAN_FUNCTION_START, PLUGIN_SCAN_FLAG_OPTIONAL);
+				PLUGIN_MAP_PATTERN(Signatures::MassSignalSubsystem_SignalEntity), PLUGIN_SCAN_FUNCTION_START, PLUGIN_SCAN_FLAG_OPTIONAL);
 			if (!addr)
 				LOG_WARN("ProductionMass: UMassSignalSubsystem::SignalEntity unresolved");
 

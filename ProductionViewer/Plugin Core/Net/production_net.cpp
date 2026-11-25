@@ -85,7 +85,9 @@ namespace ProductionNet
 
 		// True from a ChimeraMain world loading until it ends. The tick runs at the
 		// main menu too, where the net mode reads Standalone, so the role is only
-		// resolved while a game world is up.
+		// resolved while a game world is up. It depends on the loader's
+		// experience-load-complete hook (see OnSessionLoaded): a build where that
+		// hook did not install never leaves DetectingSession.
 		std::atomic<bool> g_worldActive{ false };
 
 		// ---- Authority side ----------------------------------------------

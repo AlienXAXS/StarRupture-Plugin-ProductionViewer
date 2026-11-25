@@ -5,12 +5,8 @@
 - The Go arrow turns with the camera, so it points the right way in the drone and in vehicles. Distances over 1000 m show in km
 - The Go overlay finds its base again after loading a save or travelling. If it can't, it shows "Location lost." and closes after about a minute
 - Uses the version object map row for FMassEntityManager::IsEntityValid to check a base core still exists
-- Item icons now come from the loader's image library. A row keeps its place while its icon loads. This version needs ModLoader 1.24.0 or newer
-- Item pictures are bigger and sharper
-- Ammo and the blueprint items are now counted as separate items, each with its own icon. They used to be added together into one row with the Ammo icon. That old combined row is removed from saved sessions, so these items count again from zero
-- Keeps working if a game update changes the size of the base core query results, item stacks or the item name helper. The sizes now come from the loader's version object map
-- Dedicated server: reads its game values from the version object map when the mod loader has rows for that server build, the same as the client; otherwise it finds those values itself, as before
-- Dedicated server: "Counting what factories craft" and "Splitting production by base" work again on a server build the loader has no rows for. The pattern that finds the fragment pointer call now matches the server's game files too
+- Dedicated server: reads its game values from the version object map, the same as the client. Keep the mod loader up to date: it carries the rows for each server build
+- Dedicated server: "Counting what factories craft" and "Splitting production by base" work again on server builds. The fragment pointer call they need now has a version object map row that covers the server builds
 - Dedicated server: the plugin keeps the right world after a world change
 - Fixed: joining a dedicated server from the main menu showed only your own production, not the server's
 - Building: plain Debug and Release build the Client configuration, and the game build number comes from the SDK headers instead of a fixed value
