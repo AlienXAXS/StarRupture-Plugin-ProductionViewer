@@ -69,10 +69,16 @@ Item **All Time** totals are replicated as absolute values whenever a client
 joins or re-syncs, so a player who connects halfway through a session still
 sees the base's real lifetime figures rather than starting from zero.
 
-Clients also receive each base core's world position, so distances and the
-"Go" waypoint work for them the same as for the host.
+Clients also receive each base core's world position, so distances show for them
+the same as for the host.
 
-The Go overlay keeps showing the base's current name, and a rename shows within a few seconds. Its arrow turns with where the camera looks (in the drone or a vehicle too), and a distance over 1000 m is shown in km. When a base core is demolished, its row in the breakdown stays but loses its distance within a few seconds, for clients on a server too, and the overlay closes. After you load a save or travel, the overlay finds the base again by its position. If it can't, it shows "Location lost." and closes after about a minute.
+### Go to a base
+
+Click an item row to expand it: it lists the bases that make the item, nearest
+first, with how much each made. Each base with a known position has a **Go**
+button. It tracks the item in the Go to Item plugin and points at that base, on the
+full map and on screen. This needs the **Go to Item** plugin; without it the Go
+button is not shown, and everything else works as before.
 
 > **Listen hosts:** the ModLoader's network channel can only send to clients
 > from a server build -- on a client build `SendPacketToAllClients` is a no-op.
@@ -144,7 +150,7 @@ Found a bug? [Report it on GitHub](https://github.com/AlienXAXS/StarRupture-Plug
 A server host will be able to switch parts of Production Viewer off for the whole server, and back on, without a restart. The parts are:
 
 - `tracking`: counting what factories craft. Off means nothing is counted, shown or sent.
-- `basecores`: the split by base and the Go waypoint. Off means item rows have no per-base breakdown and no Go button, and an open Go overlay closes. Totals keep counting.
+- `basecores`: the split by base and the Go button. Off means item rows have no per-base breakdown and no Go button. Totals keep counting.
 - `sessionsave`: saving and loading All Time totals with the save. Off means totals don't carry over and nothing is written to the session.
 - `icons`: item pictures. Off means rows are drawn without them.
 
