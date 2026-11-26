@@ -33,6 +33,7 @@ namespace ProductionUI
 		// Why the last Go click did not work, shown in that row's tooltip. Render
 		// thread only; cleared by the next click.
 		uint64_t g_goFailBase = 0;
+		std::string g_goFailItem;
 		std::string g_goFailText;
 
 		PanelHandle g_panel = nullptr;
@@ -367,13 +368,12 @@ namespace ProductionUI
 									if (tracked < GOTO_OK)
 									{
 										g_goFailBase = base.baseKey;
+										g_goFailItem = entry.itemKey;
 										g_goFailText = api->ResultToString(tracked);
 									}
 									else
 									{
-										// A base Go to Item has not found yet is not a
-										// failure: it points at the nearest base until it
-										// appears.
+										// Go to Item keeps a pick for a base it has not seen yet as pending; the nearest base stands in until that base appears.
 										api->SelectSource(entry.itemKey.c_str(), base.baseKey);
 									}
 								}
@@ -381,7 +381,7 @@ namespace ProductionUI
 							if (imgui->IsItemHovered())
 							{
 								std::string goTip = "Tracks " + entry.name + " in Go to Item and points to " + base.baseName;
-								if (g_goFailBase == base.baseKey)
+								if (g_goFailBase == base.baseKey && g_goFailItem == entry.itemKey)
 									goTip += "\nNot tracked: " + g_goFailText;
 								imgui->SetTooltip(goTip.c_str());
 							}
