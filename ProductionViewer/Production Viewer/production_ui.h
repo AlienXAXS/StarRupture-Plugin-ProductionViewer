@@ -9,6 +9,9 @@ namespace ProductionUI
 	// Call once from PluginInit, after the config system has been initialized.
 	void Init(IPluginSelf* self);
 
+	// Game thread, once per tick. Closes the window when the viewer turns off.
+	void Tick();
+
 	// Unregisters the panel and toggle keybind. Call from PluginShutdown.
 	void Shutdown(IPluginSelf* self);
 }

@@ -126,7 +126,7 @@ namespace ProductionViewerFields
 	// loader cannot resolve on a game build turns off the part that needs it;
 	// the others carry on. A key two parts need is listed in both: base cores
 	// read an entity's location through the same subsystem and fragment
-	// accessors as tracking. The viewer window and the network stay core.
+	// accessors as tracking. The network stays core.
 	inline PluginMap::Feature Tracking{ "tracking", "Counting what factories craft",
 		KeysOf("UWorld::GetSubsystem<UMassEntitySubsystem>", "FCrCraftingFragment::StaticStruct",
 			"FMassEntityManager::InternalGetFragmentDataPtr",
@@ -151,11 +151,20 @@ namespace ProductionViewerFields
 	// Without that member there are no item names to show a picture for.
 	inline PluginMap::Feature Icons{ "icons", "Item icons", KeysOf(ItemUniqueName), {} };
 
+	// The base waypoint and the viewer window need no game value of their own.
+	// Each lists one another feature already has: the waypoint points at base
+	// cores, and the window has nothing to list without item names.
+	inline PluginMap::Feature BaseWaypoint{ "base-waypoint", "Pointing the way to a base",
+		KeysOf("UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding"), {} };
+	inline PluginMap::Feature Viewer{ "viewer", "The Production Viewer window and its key",
+		KeysOf(ItemUniqueName), {} };
+
 	// Call before Resolve and ProductionTracker::ResolvePatterns, so a miss
 	// lands on a feature and not on the plugin.
 	inline void DeclareFeatures(IPluginSelf* self, IPluginHookScanner* scanner)
 	{
-		PluginMap::DeclareFeatures(scanner, self, Tracking, BaseCores, SessionSave, Icons);
+		PluginMap::DeclareFeatures(scanner, self, Tracking, BaseCores, SessionSave, Icons,
+			BaseWaypoint, Viewer);
 	}
 
 	// Asks the loader for every row above. False when any did not resolve; the

@@ -4,6 +4,7 @@
 #include "production_mass.h"
 #include "production_basecore.h"
 #include "production_waypoint.h"
+#include "production_ui.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
 #include "production_fields.h"
 #include "Plugin Core/Net/production_net.h"
@@ -395,6 +396,7 @@ namespace ProductionTracker
 				}
 			}
 			ProductionWaypoint::Tick();
+			ProductionUI::Tick();
 			ProductionNet::Tick(deltaSeconds);
 			ServiceDeferredSessionLoad();
 

@@ -39,12 +39,12 @@
        ============================================================ -->
   <ItemDefinitionGroup Condition="'$(Configuration)' == 'Client Debug' Or '$(Configuration)' == 'Client Release'">
     <ClCompile>
-      <PreprocessorDefinitions>MODLOADER_CLIENT_BUILD;PLUGIN_NEEDS_INTERFACE=77;PLUGIN_OPTIONAL_INTERFACE=82;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MODLOADER_CLIENT_BUILD;PLUGIN_NEEDS_INTERFACE=77;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)' == 'Server Debug' Or '$(Configuration)' == 'Server Release'">
     <ClCompile>
-      <PreprocessorDefinitions>MODLOADER_SERVER_BUILD;PLUGIN_NEEDS_INTERFACE=77;PLUGIN_OPTIONAL_INTERFACE=82;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MODLOADER_SERVER_BUILD;PLUGIN_NEEDS_INTERFACE=77;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
 

@@ -3,6 +3,7 @@
 #include "plugin_images.h"
 #include "production_tracker.h"
 #include "production_waypoint.h"
+#include "production_fields.h"
 #include "Plugin Core/Helpers/plugin_helpers.h"
 #include "Plugin Core/Config/plugin_config.h"
 #include "Plugin Core/Net/production_net.h"
@@ -33,6 +34,7 @@ namespace ProductionUI
 		PanelHandle g_panel = nullptr;
 		IPluginSelf* g_self = nullptr;
 		bool g_panelOpen = false;
+		bool g_viewerWasOn = true;     // Tick only
 
 		int s_selectedRangeIndex = 0; // default to "1m"
 
@@ -350,8 +352,17 @@ namespace ProductionUI
 						{
 							imgui->SameLine(0.0f, 8.0f);
 							std::string goId = "Go##waypoint_" + std::to_string(base.baseKey);
+							const bool waypointOn = ProductionViewerFields::BaseWaypoint.On()
+								&& ProductionViewerFields::BaseCores.On();
+							imgui->BeginDisabled(!waypointOn);
 							if (imgui->SmallButton(goId.c_str()))
 								ProductionWaypoint::SetTarget(base.baseKey, base.baseName);
+							imgui->EndDisabled();
+							if (!waypointOn)
+							{
+								imgui->SameLine(0.0f, -1.0f);
+								imgui->TextDisabled("(waypoint unavailable)");
+							}
 						}
 
 						imgui->TableNextColumn();
@@ -553,6 +564,12 @@ namespace ProductionUI
 		// Top-level render callback registered with the panel.
 		void RenderProductionWindow(IModLoaderImGui* imgui)
 		{
+			if (!ProductionViewerFields::Viewer.On())
+			{
+				imgui->TextDisabled("The Production Viewer window is unavailable.");
+				return;
+			}
+
 			// Time range selector
 			const auto& ranges = ProductionData::GetTimeRanges();
 			for (size_t i = 0; i < ranges.size(); ++i)
@@ -632,7 +649,7 @@ namespace ProductionUI
 		{
 			LOG_DEBUG("ProductionUI: OnToggleKey (key=%u, event=%u)", static_cast<unsigned>(key), static_cast<unsigned>(event));
 
-			if (event != EModKeyEvent::Pressed)
+			if (event != EModKeyEvent::Pressed || !ProductionViewerFields::Viewer.On())
 				return;
 
 			if (!g_self || !g_self->hooks->UI || !g_panel)
@@ -696,6 +713,17 @@ namespace ProductionUI
 		}
 
 		LOG_INFO("Production Viewer window registered");
+	}
+
+	void Tick()
+	{
+		const bool on = ProductionViewerFields::Viewer.On();
+		if (g_viewerWasOn && !on && g_self && g_self->hooks->UI && g_panel)
+		{
+			g_self->hooks->UI->SetPanelClose(g_panel);
+			g_panelOpen = false;
+		}
+		g_viewerWasOn = on;
 	}
 
 	void Shutdown(IPluginSelf* self)

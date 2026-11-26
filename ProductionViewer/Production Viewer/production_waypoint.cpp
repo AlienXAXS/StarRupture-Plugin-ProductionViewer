@@ -38,14 +38,12 @@ namespace ProductionWaypoint
 		bool g_locValid = false;
 		SDK::FVector g_loc{};          // last known position of the base
 		std::chrono::steady_clock::time_point g_searchStart;
-		bool g_paused = false;         // the whole plugin is denied; the target waits for an allow
+		bool g_paused = false;         // the waypoint is off; the target waits until it is back on
 
-		bool HostDenied()
+		// The waypoint points at base cores, so it is off when either part is.
+		bool WaypointOn()
 		{
-			if (!g_self || !g_self->hooks)
-				return false;
-			const auto denied = PluginOptHostDenied(g_self->hooks->Network);
-			return denied && denied(g_self) == 1;
+			return ProductionViewerFields::BaseWaypoint.On() && ProductionViewerFields::BaseCores.On();
 		}
 
 		PluginWaypoint::Options MakeOptions()
@@ -61,10 +59,11 @@ namespace ProductionWaypoint
 		PluginWaypoint::Waypoint g_waypoint(MakeOptions());
 
 		// A paused target belongs to the world it was set in: nothing resolves it
-		// while paused, so it goes when that world does.
+		// while paused, so it goes when that world does. The features are read
+		// too, for a world that ends before a tick has paused the target.
 		bool ClearIfPausedLocked()
 		{
-			if (!g_paused)
+			if (!g_paused && WaypointOn())
 				return false;
 			g_paused = false;
 			g_waypoint.Clear();
@@ -187,6 +186,11 @@ namespace ProductionWaypoint
 
 		void RenderWaypointWidget(IModLoaderImGui* imgui)
 		{
+			// Tick hides the widget and shows it again. Hiding it here could
+			// leave it hidden if the waypoint came back on before that tick.
+			if (!WaypointOn())
+				return;
+
 			imgui->SetWindowFontScale(1.15f);
 			if (!g_waypoint.Render(imgui))
 				HideWidget();
@@ -260,29 +264,38 @@ namespace ProductionWaypoint
 
 	void Tick()
 	{
-		if (!ProductionViewerFields::BaseCores.On())
-		{
-			// The whole plugin denied: the target is kept for the allow (the
-			// loader stops drawing the widget). The base split alone turned off:
-			// the overlay closes.
-			const bool denied = HostDenied();
-			std::lock_guard<std::mutex> lock(g_mutex);
-			g_paused = denied && g_waypoint.Active();
-			if (!denied)
-				g_waypoint.Clear();
-			return;
-		}
+		const bool on = WaypointOn();
+		bool hide = false;
+		bool show = false;
 		{
 			std::lock_guard<std::mutex> lock(g_mutex);
-			g_paused = false;
+			if (!on && !g_paused && g_waypoint.Active())
+			{
+				g_paused = true;
+				hide = true;
+			}
+			else if (on && g_paused)
+			{
+				g_paused = false;
+				// Time spent off doesn't count against the search for the base.
+				if (g_searching)
+					g_searchStart = std::chrono::steady_clock::now();
+				show = g_waypoint.Active();
+			}
 		}
 
-		g_waypoint.Tick(PluginSdkRuntime::GetWorld());
+		if (hide)
+			HideWidget();
+		if (show && g_self && g_self->hooks->UI && g_widget)
+			g_self->hooks->UI->SetWidgetVisible(g_widget, true);
+
+		if (on)
+			g_waypoint.Tick(PluginSdkRuntime::GetWorld());
 	}
 
 	void SetTarget(uint64_t baseKey, const std::string& baseName)
 	{
-		if (!ProductionViewerFields::BaseCores.On())
+		if (!WaypointOn())
 			return;
 
 		// The row that was clicked has a cached location, so a world change
