@@ -48,17 +48,6 @@ namespace ProductionWaypoint
 			return denied && denied(g_self) == 1;
 		}
 
-		// A paused target belongs to the world it was set in: nothing resolves it
-		// while paused, so it goes when that world does.
-		bool ClearIfPausedLocked()
-		{
-			if (!g_paused)
-				return false;
-			g_paused = false;
-			g_waypoint.Clear();
-			return true;
-		}
-
 		PluginWaypoint::Options MakeOptions()
 		{
 			PluginWaypoint::Options options;
@@ -70,6 +59,17 @@ namespace ProductionWaypoint
 		}
 
 		PluginWaypoint::Waypoint g_waypoint(MakeOptions());
+
+		// A paused target belongs to the world it was set in: nothing resolves it
+		// while paused, so it goes when that world does.
+		bool ClearIfPausedLocked()
+		{
+			if (!g_paused)
+				return false;
+			g_paused = false;
+			g_waypoint.Clear();
+			return true;
+		}
 
 		// Closes the overlay if the target is still the one the caller resolved.
 		// The widget is hidden by the render callback, which sees Render() fail.

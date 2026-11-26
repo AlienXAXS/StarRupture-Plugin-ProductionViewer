@@ -78,6 +78,8 @@ static void OnWorldEndPlay(SDK::UWorld* world, const char* worldName)
 		ProductionTracker::OnSessionEnded();
 }
 
+PLUGIN_EXPORT_HOST_INFO()
+
 extern "C" {
 
 	__declspec(dllexport) PluginInfo* GetPluginInfo()
