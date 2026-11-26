@@ -31,6 +31,9 @@ namespace ProductionWaypoint
 	// Call after ProductionBaseCore::OnSessionLoaded.
 	void OnSessionLoaded();
 
+	// The world is ending. A target kept through a whole-plugin deny is dropped.
+	void OnSessionEnded();
+
 	// Starts navigating to the given base core (key from
 	// ProductionBaseCore::PackHandle) and shows the overlay. Replaces any
 	// previously active target.

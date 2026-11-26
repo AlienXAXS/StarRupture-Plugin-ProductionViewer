@@ -482,6 +482,7 @@ namespace ProductionTracker
 		// Before the role goes: a solo or host session is saved under its own
 		// role, and is not written again once the role is gone.
 		SaveToSession();
+		ProductionWaypoint::OnSessionEnded();
 		ProductionNet::OnSessionEnded();
 	}
 

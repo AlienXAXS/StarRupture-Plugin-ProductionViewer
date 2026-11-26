@@ -84,8 +84,8 @@ namespace ProductionMass
 			if (g_originalSignalEntity)
 				g_originalSignalEntity(self, signalName, entity);
 
-			// A server rule can turn counting off after the hook went in; the
-			// game's own call above has already run.
+			// Counting can be off now and on later, so it is checked per call and
+			// not when the hook goes in; the game's own call above has already run.
 			if (!g_callback || !self || !ProductionViewerFields::Tracking.On())
 				return;
 
@@ -268,12 +268,6 @@ namespace ProductionMass
 
 	bool Init(IPluginSelf* self, CraftingCompleteCallback callback)
 	{
-		if (!ProductionViewerFields::Tracking.On())
-		{
-			LOG_WARN("ProductionMass: crafting counts are off - the game update moved something they need");
-			return false;
-		}
-
 		if (!self->hooks->Hooks)
 		{
 			LOG_WARN("ProductionMass: hooks unavailable - Mass-simulated crafting will not be tracked");

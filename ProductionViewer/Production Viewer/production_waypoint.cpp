@@ -38,6 +38,26 @@ namespace ProductionWaypoint
 		bool g_locValid = false;
 		SDK::FVector g_loc{};          // last known position of the base
 		std::chrono::steady_clock::time_point g_searchStart;
+		bool g_paused = false;         // the whole plugin is denied; the target waits for an allow
+
+		bool HostDenied()
+		{
+			if (!g_self || !g_self->hooks)
+				return false;
+			const auto denied = PluginOptHostDenied(g_self->hooks->Network);
+			return denied && denied(g_self) == 1;
+		}
+
+		// A paused target belongs to the world it was set in: nothing resolves it
+		// while paused, so it goes when that world does.
+		bool ClearIfPausedLocked()
+		{
+			if (!g_paused)
+				return false;
+			g_paused = false;
+			g_waypoint.Clear();
+			return true;
+		}
 
 		PluginWaypoint::Options MakeOptions()
 		{
@@ -211,13 +231,14 @@ namespace ProductionWaypoint
 		}
 
 		g_waypoint.Clear();
+		g_paused = false;
 		g_self = nullptr;
 	}
 
 	void OnSessionLoaded()
 	{
 		std::lock_guard<std::mutex> lock(g_mutex);
-		if (!g_waypoint.Active())
+		if (ClearIfPausedLocked() || !g_waypoint.Active())
 			return;
 
 		// Handles from the old world are meaningless; keep the last position and
@@ -231,14 +252,29 @@ namespace ProductionWaypoint
 			g_waypoint.Clear();
 	}
 
+	void OnSessionEnded()
+	{
+		std::lock_guard<std::mutex> lock(g_mutex);
+		ClearIfPausedLocked();
+	}
+
 	void Tick()
 	{
-		// The base split turned off by the server: the overlay closes.
 		if (!ProductionViewerFields::BaseCores.On())
 		{
+			// The whole plugin denied: the target is kept for the allow (the
+			// loader stops drawing the widget). The base split alone turned off:
+			// the overlay closes.
+			const bool denied = HostDenied();
 			std::lock_guard<std::mutex> lock(g_mutex);
-			g_waypoint.Clear();
+			g_paused = denied && g_waypoint.Active();
+			if (!denied)
+				g_waypoint.Clear();
 			return;
+		}
+		{
+			std::lock_guard<std::mutex> lock(g_mutex);
+			g_paused = false;
 		}
 
 		g_waypoint.Tick(PluginSdkRuntime::GetWorld());
