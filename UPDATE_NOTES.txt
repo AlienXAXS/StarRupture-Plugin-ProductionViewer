@@ -3,5 +3,8 @@
 - A renamed base shows its new name on the Go overlay within a few seconds, for clients on a server too
 - The Go arrow turns with the camera, so it points the right way in the drone and in vehicles. Distances over 1000 m show in km
 - The Go overlay finds its base again after loading a save or travelling. If it can't, it shows "Location lost." and closes after about a minute
+- Dedicated server: reads its game values from the version map, the same as the client. Keep the mod loader up to date: it carries the rows for each server build
+- Dedicated server: "Counting what factories craft" and "Splitting production by base" work again on server builds. The fragment pointer call they need now has a version map row that covers the server builds
+- Dedicated server: the plugin keeps the right world after a world change
 - Fixed: joining a dedicated server from the main menu showed only your own production, not the server's
 - You can now install and update it from the mod loader's Browse list.

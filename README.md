@@ -7,6 +7,8 @@ factories produce and consume, and shows it in a live, searchable dashboard.
 
 **Requires:** ModLoader 1.24.0 or newer ([StarRupture-ModLoader](https://github.com/AlienXAXS/StarRupture-ModLoader))
 
+On a dedicated server, keep the mod loader up to date. It carries the version object map rows for each server build. On a server build it has no rows for, counting and the split by base switch off.
+
 ---
 
 ## What It Does
