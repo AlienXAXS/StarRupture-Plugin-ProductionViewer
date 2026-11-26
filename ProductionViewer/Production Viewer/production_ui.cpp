@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cctype>
 #include <cfloat>
 #include <cmath>
@@ -33,7 +34,7 @@ namespace ProductionUI
 
 		PanelHandle g_panel = nullptr;
 		IPluginSelf* g_self = nullptr;
-		bool g_panelOpen = false;
+		std::atomic<bool> g_panelOpen{ false };   // key callback and Tick
 		bool g_viewerWasOn = true;     // Tick only
 
 		int s_selectedRangeIndex = 0; // default to "1m"
@@ -352,8 +353,7 @@ namespace ProductionUI
 						{
 							imgui->SameLine(0.0f, 8.0f);
 							std::string goId = "Go##waypoint_" + std::to_string(base.baseKey);
-							const bool waypointOn = ProductionViewerFields::BaseWaypoint.On()
-								&& ProductionViewerFields::BaseCores.On();
+							const bool waypointOn = ProductionWaypoint::IsOn();
 							imgui->BeginDisabled(!waypointOn);
 							if (imgui->SmallButton(goId.c_str()))
 								ProductionWaypoint::SetTarget(base.baseKey, base.baseName);

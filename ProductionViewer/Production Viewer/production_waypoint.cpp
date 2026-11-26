@@ -40,12 +40,6 @@ namespace ProductionWaypoint
 		std::chrono::steady_clock::time_point g_searchStart;
 		bool g_paused = false;         // the waypoint is off; the target waits until it is back on
 
-		// The waypoint points at base cores, so it is off when either part is.
-		bool WaypointOn()
-		{
-			return ProductionViewerFields::BaseWaypoint.On() && ProductionViewerFields::BaseCores.On();
-		}
-
 		PluginWaypoint::Options MakeOptions()
 		{
 			PluginWaypoint::Options options;
@@ -63,7 +57,7 @@ namespace ProductionWaypoint
 		// too, for a world that ends before a tick has paused the target.
 		bool ClearIfPausedLocked()
 		{
-			if (!g_paused && WaypointOn())
+			if (!g_paused && IsOn())
 				return false;
 			g_paused = false;
 			g_waypoint.Clear();
@@ -188,13 +182,19 @@ namespace ProductionWaypoint
 		{
 			// Tick hides the widget and shows it again. Hiding it here could
 			// leave it hidden if the waypoint came back on before that tick.
-			if (!WaypointOn())
+			if (!IsOn())
 				return;
 
 			imgui->SetWindowFontScale(1.15f);
 			if (!g_waypoint.Render(imgui))
 				HideWidget();
 		}
+	}
+
+	// The waypoint points at base cores, so it is off when either part is.
+	bool IsOn()
+	{
+		return ProductionViewerFields::BaseWaypoint.On() && ProductionViewerFields::BaseCores.On();
 	}
 
 	void Init(IPluginSelf* self)
@@ -264,7 +264,7 @@ namespace ProductionWaypoint
 
 	void Tick()
 	{
-		const bool on = WaypointOn();
+		const bool on = IsOn();
 		bool hide = false;
 		bool show = false;
 		{
@@ -295,7 +295,7 @@ namespace ProductionWaypoint
 
 	void SetTarget(uint64_t baseKey, const std::string& baseName)
 	{
-		if (!WaypointOn())
+		if (!IsOn())
 			return;
 
 		// The row that was clicked has a cached location, so a world change

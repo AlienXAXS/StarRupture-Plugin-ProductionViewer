@@ -157,7 +157,7 @@ namespace ProductionViewerFields
 	inline PluginMap::Feature BaseWaypoint{ "base-waypoint", "Pointing the way to a base",
 		KeysOf("UCrBaseCoreSubsystem::GetBaseCoresRangedBuilding"), {} };
 	inline PluginMap::Feature Viewer{ "viewer", "The Production Viewer window and its key",
-		KeysOf(ItemUniqueName), {} };
+		KeysOf(ItemUniqueName), KeysOf("Menu.ToggleKey") };
 
 	// Call before Resolve and ProductionTracker::ResolvePatterns, so a miss
 	// lands on a feature and not on the plugin.

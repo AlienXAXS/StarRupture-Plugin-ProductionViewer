@@ -31,7 +31,10 @@ namespace ProductionWaypoint
 	// Call after ProductionBaseCore::OnSessionLoaded.
 	void OnSessionLoaded();
 
-	// The world is ending. A target kept through a whole-plugin deny is dropped.
+	// False while the waypoint is off: the target is kept, nothing is drawn.
+	bool IsOn();
+
+	// The world is ending. A target kept while the waypoint is off is dropped.
 	void OnSessionEnded();
 
 	// Starts navigating to the given base core (key from
