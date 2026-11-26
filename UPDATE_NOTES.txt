@@ -9,3 +9,4 @@
 - Dedicated server: the plugin keeps the right world after a world change
 - Fixed: joining a dedicated server from the main menu showed only your own production, not the server's
 - Building: plain Debug and Release build the Client configuration, and the game build number comes from the SDK headers instead of a fixed value
+- You can now install and update it from the mod loader's Browse list.
