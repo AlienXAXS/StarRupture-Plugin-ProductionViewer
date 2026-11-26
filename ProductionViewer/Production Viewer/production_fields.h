@@ -146,8 +146,10 @@ namespace ProductionViewerFields
 	inline PluginMap::Feature SessionSave{ "sessionsave", "Keeping totals for each saved game",
 		KeysOf(ServerSessionName), {} };
 	// Item pictures come from the loader's image library, which has no map key
-	// of its own, so only a server rule can turn this one off.
-	inline PluginMap::Feature Icons{ "icons", "Item icons", {}, {} };
+	// of its own. A feature has to list at least one key or the loader refuses
+	// it, so this one lists the unique item name the pictures are looked up by.
+	// Without that member there are no item names to show a picture for.
+	inline PluginMap::Feature Icons{ "icons", "Item icons", KeysOf(ItemUniqueName), {} };
 
 	// Call before Resolve and ProductionTracker::ResolvePatterns, so a miss
 	// lands on a feature and not on the plugin.
