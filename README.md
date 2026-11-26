@@ -5,7 +5,7 @@ factories produce and consume, and shows it in a live, searchable dashboard.
 
 **Target:** Game client, plus a headless server build that feeds connected clients
 
-**Requires:** ModLoader 1.25.0 or newer ([StarRupture-ModLoader](https://github.com/AlienXAXS/StarRupture-ModLoader))
+**Requires:** ModLoader 1.24.0 or newer ([StarRupture-ModLoader](https://github.com/AlienXAXS/StarRupture-ModLoader))
 
 On a dedicated server, keep the mod loader up to date. It carries the version object map rows for each server build, and on a server build it has no rows for, the plugin finds those values itself, as before.
 
@@ -77,7 +77,7 @@ the same as for the host.
 Click an item row to expand it: it lists the bases that make the item, nearest
 first, with how much each made. Each base with a known position has a **Go**
 button. It tracks the item in the Go to Item plugin and points at that base, on the
-full map and on screen. This needs the **Go to Item** plugin; without it the Go
+full map and on screen. If it can't track the item (for example, 7 items are already tracked), hover the button to see why. This needs the **Go to Item** plugin; without it the Go
 button is not shown, and everything else works as before.
 
 > **Listen hosts:** the ModLoader's network channel can only send to clients

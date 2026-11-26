@@ -30,6 +30,11 @@ namespace ProductionUI
 		// the ImGui headers directly.
 		constexpr int ImGuiCol_Button = 21;
 
+		// Why the last Go click did not work, shown in that row's tooltip. Render
+		// thread only; cleared by the next click.
+		uint64_t g_goFailBase = 0;
+		std::string g_goFailText;
+
 		PanelHandle g_panel = nullptr;
 		IPluginSelf* g_self = nullptr;
 		bool g_panelOpen = false;
@@ -357,13 +362,27 @@ namespace ProductionUI
 							{
 								if (const GoToItemApi* api = GoToItem::Get())
 								{
-									if (api->TrackItem(entry.itemKey.c_str()) >= GOTO_OK)
+									g_goFailBase = 0;
+									const int32_t tracked = api->TrackItem(entry.itemKey.c_str());
+									if (tracked < GOTO_OK)
+									{
+										g_goFailBase = base.baseKey;
+										g_goFailText = api->ResultToString(tracked);
+									}
+									else
+									{
+										// A base Go to Item has not found yet is not a
+										// failure: it points at the nearest base until it
+										// appears.
 										api->SelectSource(entry.itemKey.c_str(), base.baseKey);
+									}
 								}
 							}
 							if (imgui->IsItemHovered())
 							{
 								std::string goTip = "Tracks " + entry.name + " in Go to Item and points to " + base.baseName;
+								if (g_goFailBase == base.baseKey)
+									goTip += "\nNot tracked: " + g_goFailText;
 								imgui->SetTooltip(goTip.c_str());
 							}
 						}

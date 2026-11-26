@@ -1324,19 +1324,6 @@ namespace ProductionNet
 		g_snapshotRequests.push_back(playerController);
 	}
 
-	bool GetRemoteBaseName(uint64_t baseKey, std::string& outName)
-	{
-		for (const auto& [baseId, base] : g_remoteBases)
-		{
-			if (base.key == baseKey)
-			{
-				outName = base.name;
-				return true;
-			}
-		}
-		return false;
-	}
-
 	SessionRole GetRole()
 	{
 		return g_role.load(std::memory_order_relaxed);

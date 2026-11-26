@@ -107,9 +107,6 @@ namespace ProductionTracker
 	// The server reported a base core as gone: forgets its location.
 	void ClearRemoteBaseLocation(uint64_t baseKey);
 
-	// The name the server last announced for a base core. Game thread only.
-	bool GetRemoteBaseName(uint64_t baseKey, std::string& outName);
-
 	// Replaces an item's All Time totals with the server's, discarding whatever
 	// this client had accumulated. Sent on join and on every resync, which is
 	// what makes a dropped packet self-correcting rather than permanent drift.

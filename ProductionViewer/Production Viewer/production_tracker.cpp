@@ -656,11 +656,6 @@ namespace ProductionTracker
 		ProductionBaseCore::ClearRemoteBaseLocation(baseKey);
 	}
 
-	bool GetRemoteBaseName(uint64_t baseKey, std::string& outName)
-	{
-		return ProductionNet::GetRemoteBaseName(baseKey, outName);
-	}
-
 	void SeedRemoteItem(const std::string& itemKey, const std::string& displayName,
 		float allTimeProduced, float allTimeConsumed, float allTimeElapsedSeconds)
 	{

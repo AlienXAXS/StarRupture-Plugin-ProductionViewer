@@ -2,7 +2,7 @@
 - Changed: the Go button next to a base in an item's breakdown now tracks the item in the Go to Item plugin and points at that base, on the map and on screen. The built-in Go overlay and arrow are removed. Without the Go to Item plugin the Go button is not shown
 - Fixed: a demolished base core loses its distance within a few seconds. Its row stays in the breakdown. Clients on a server see the same
 - Uses the version object map row for FMassEntityManager::IsEntityValid to check a base core still exists
-- Item icons now come from the loader's image library. A row keeps its place while its icon loads. This version needs ModLoader 1.25.0 or newer
+- Item icons now come from the loader's image library. A row keeps its place while its icon loads. This version needs ModLoader 1.24.0 or newer
 - Item pictures are bigger and sharper
 - Ammo and the blueprint items are now counted as separate items, each with its own icon. They used to be added together into one row with the Ammo icon. That old combined row is removed from saved sessions, so these items count again from zero
 - Keeps working if a game update changes the size of the base core query results, item stacks or the item name helper. The sizes now come from the loader's version object map

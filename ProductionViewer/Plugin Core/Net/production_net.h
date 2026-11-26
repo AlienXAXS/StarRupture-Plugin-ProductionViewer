@@ -128,11 +128,6 @@ namespace ProductionNet
 	// yet at PostLogin, and packets sent then are dropped, not buffered.
 	void SendSnapshotTo(void* playerController);
 
-	// Client: the name the server last announced for a base core, empty-handed
-	// (false) if none has arrived. Game thread only, like the packet handlers that
-	// write it.
-	bool GetRemoteBaseName(uint64_t baseKey, std::string& outName);
-
 	SessionRole GetRole();
 
 	// True once the role is known to be a remote client: this instance must not

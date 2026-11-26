@@ -548,27 +548,6 @@ namespace ProductionBaseCore
 		g_baseLocations[baseKey] = location;
 	}
 
-	bool FindBaseNear(const SDK::FVector& position, double radiusCm, uint64_t& outKey)
-	{
-		std::lock_guard<std::mutex> lock(g_mutex);
-		double bestSquared = radiusCm * radiusCm;
-		bool found = false;
-		for (const auto& [key, location] : g_baseLocations)
-		{
-			const double dx = location.X - position.X;
-			const double dy = location.Y - position.Y;
-			const double dz = location.Z - position.Z;
-			const double squared = dx * dx + dy * dy + dz * dz;
-			if (squared <= bestSquared)
-			{
-				bestSquared = squared;
-				outKey = key;
-				found = true;
-			}
-		}
-		return found;
-	}
-
 	bool GetBaseCoreLocation(uint64_t baseKey, SDK::FVector& outLocation)
 	{
 		std::lock_guard<std::mutex> lock(g_mutex);
