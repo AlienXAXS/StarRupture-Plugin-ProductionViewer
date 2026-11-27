@@ -42,7 +42,7 @@ static PluginInfo s_pluginInfo = {
 	PLUGIN_DECLARED_INTERFACE,
 	PLUGIN_TARGET_THIS,
 	PLUGIN_GAME_BUILT_CL,
-	PLUGIN_MAP_MIGRATED
+	PLUGIN_MAP_MIGRATED | PLUGIN_HANDLES_HOST_DENY
 };
 
 // Wire id = the packet schema constant (see RuptureTimer for the reasoning).
