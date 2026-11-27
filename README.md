@@ -72,6 +72,21 @@ sees the base's real lifetime figures rather than starting from zero.
 Clients also receive each base core's world position, so distances and the
 "Go" waypoint work for them the same as for the host.
 
+### Go to a base
+
+Click an item row to expand it: it lists the bases for that item. Each base with
+a known position has a **Go** button. It opens a small overlay with an arrow and
+the distance to that base.
+
+With the **Go to Item** plugin installed and turned on (it is optional), Go on a
+production row uses it instead, for the items it can track: it tracks the item in
+Go to Item and points to that base, on the full map and on screen, and closes the
+Go overlay if one is open. If Go to Item doesn't know where the item is produced
+yet, its markers appear once it does. Hovering the button tells you when it uses
+Go to Item, and after a click that failed, why (for example, you already track as
+many items as Go to Item allows). Go on consumption rows, and on items Go to Item
+can't track, opens the overlay as above and leaves what Go to Item tracks alone.
+
 The Go overlay keeps showing the base's current name, and a rename shows within a few seconds. Its arrow turns with where the camera looks (in the drone or a vehicle too), and a distance over 1000 m is shown in km. When a base core is demolished, its row in the breakdown stays but loses its distance within a few seconds, for clients on a server too, and the overlay closes. After you load a save or travel, the overlay finds the base again by its position. If it can't, it shows "Location lost." and closes after about a minute.
 
 > **Listen hosts:** the ModLoader's network channel can only send to clients

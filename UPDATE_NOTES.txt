@@ -1,3 +1,4 @@
+- With the Go to Item plugin installed and turned on, Go on a production row tracks the item in Go to Item and points to that base, on the map and on screen. If that fails, hover the button to see why. For items Go to Item can't track, and without it, Go works as before
 - Fixed: a demolished base core loses its distance within a few seconds and the Go overlay closes. Its row stays in the breakdown. Clients on a server see the same
 - The Go overlay keeps the base's current name, and closes when the base is demolished
 - A renamed base shows its new name on the Go overlay within a few seconds, for clients on a server too
