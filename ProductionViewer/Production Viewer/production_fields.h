@@ -56,14 +56,18 @@ namespace ProductionViewerFields
 
 	using PluginMap::SharedRef;
 
+	// The four rows below are for members the SDK has no name for (or, for the
+	// translation, a different size): native rows. The loader's map holds each per
+	// game build, and the plugin's own rows after them are used where it has none.
+	// None has a compiled-in offset. The plugin's rows for builds 128786 and 130045
+	// are the client game's, so the server build carries only build 127004's.
+
 	// FCrGridEntityHandle's two members sit in a struct the SDK keeps as
-	// padding. Their rows below are CL-127004's, the build this plugin was
-	// compiled against; every other build comes from the loader's map, and a
-	// build with neither turns off the feature using them.
+	// padding. Without them the feature using them is off.
 	inline auto GridEntityHandle = PluginField<uint64_t>{ { "FCrGridEntityHandle::EntityHandle",
-		"FCrGridEntityHandle", "EntityHandle", PLUGIN_FIELD_NATIVE, sizeof(uint64_t), 0x0 } };
+		"FCrGridEntityHandle", "EntityHandle", PLUGIN_FIELD_NATIVE, sizeof(uint64_t), -1 } };
 	inline auto GridEntityData = PluginField<SharedRef>{ { "FCrGridEntityHandle::Data",
-		"FCrGridEntityHandle", "Data", PLUGIN_FIELD_NATIVE, sizeof(SharedRef), 0x8 } };
+		"FCrGridEntityHandle", "Data", PLUGIN_FIELD_NATIVE, sizeof(SharedRef), -1 } };
 	// Stepped through as an array element: the size the running game reflects,
 	// read with PluginMap::ElementAt.
 	inline auto GridEntityHandleSize = SR_SIZE(FCrGridEntityHandle);
@@ -72,27 +76,40 @@ namespace ProductionViewerFields
 	// register, 0x20 bytes in the PDB, while the reflected and SDK member is the
 	// 0x18-byte FVector, so it is a native row at the size the plugin reads.
 	inline auto TransformTranslation = PluginField<SDK::FVector>{ { "FTransform::Translation",
-		"FTransform", "Translation", PLUGIN_FIELD_NATIVE, sizeof(SDK::FVector), 0x20 } };
+		"FTransform", "Translation", PLUGIN_FIELD_NATIVE, sizeof(SDK::FVector), -1 } };
+
+	// UCrGameInstance::ServerSessionName is folded into the SDK's trailing padding,
+	// so it has no name there.
+	inline auto ServerSessionName = PluginField<SDK::FString>{ { "UCrGameInstance::ServerSessionName",
+		"UCrGameInstance", "ServerSessionName", PLUGIN_FIELD_NATIVE, sizeof(SDK::FString), -1 } };
 
 	inline const PluginFieldCandidate kGridEntityHandleRows[] = {
 		{ 127004, 0x0, static_cast<uint32_t>(sizeof(uint64_t)), 0, nullptr },
+#ifdef MODLOADER_CLIENT_BUILD
+		{ 128786, 0x0, static_cast<uint32_t>(sizeof(uint64_t)), 0, nullptr },
+		{ 130045, 0x0, static_cast<uint32_t>(sizeof(uint64_t)), 0, nullptr },
+#endif
 	};
 	inline const PluginFieldCandidate kGridEntityDataRows[] = {
 		{ 127004, 0x8, static_cast<uint32_t>(sizeof(SharedRef)), 0, nullptr },
+#ifdef MODLOADER_CLIENT_BUILD
+		{ 128786, 0x8, static_cast<uint32_t>(sizeof(SharedRef)), 0, nullptr },
+		{ 130045, 0x8, static_cast<uint32_t>(sizeof(SharedRef)), 0, nullptr },
+#endif
 	};
 	inline const PluginFieldCandidate kTransformTranslationRows[] = {
 		{ 127004, 0x20, static_cast<uint32_t>(sizeof(SDK::FVector)), 0, nullptr },
+#ifdef MODLOADER_CLIENT_BUILD
+		{ 128786, 0x20, static_cast<uint32_t>(sizeof(SDK::FVector)), 0, nullptr },
+		{ 130045, 0x20, static_cast<uint32_t>(sizeof(SDK::FVector)), 0, nullptr },
+#endif
 	};
-
-	// UCrGameInstance::ServerSessionName is folded into the SDK's trailing padding,
-	// so it has no name there: a native row. The row below is CL-127004's, the
-	// build this plugin was compiled against; every other build comes from the
-	// loader's map.
-	inline auto ServerSessionName = PluginField<SDK::FString>{ { "UCrGameInstance::ServerSessionName",
-		"UCrGameInstance", "ServerSessionName", PLUGIN_FIELD_NATIVE, sizeof(SDK::FString), 0x290 } };
-
 	inline const PluginFieldCandidate kServerSessionNameRows[] = {
-		{ 127004, 0x290, sizeof(SDK::FString), 0, nullptr },
+		{ 127004, 0x290, static_cast<uint32_t>(sizeof(SDK::FString)), 0, nullptr },
+#ifdef MODLOADER_CLIENT_BUILD
+		{ 128786, 0x2A0, static_cast<uint32_t>(sizeof(SDK::FString)), 0, nullptr },
+		{ 130045, 0x2A0, static_cast<uint32_t>(sizeof(SDK::FString)), 0, nullptr },
+#endif
 	};
 
 	// The SDK's helpers, under the names the plugin uses.
@@ -180,13 +197,13 @@ namespace ProductionViewerFields
 		all = PluginMap::ResolveMassSignalWorld(scanner, self) && all;
 		all = PluginMap::ResolveMassEntityManager(scanner, self) && all;
 		all = PluginMap::ResolveField(scanner, self, ServerSessionName, kServerSessionNameRows,
-			static_cast<uint32_t>(std::size(kServerSessionNameRows))) && all;
+			static_cast<uint32_t>(std::size(kServerSessionNameRows)), 0) && all;
 		all = PluginMap::ResolveField(scanner, self, GridEntityHandle, kGridEntityHandleRows,
-			static_cast<uint32_t>(std::size(kGridEntityHandleRows))) && all;
+			static_cast<uint32_t>(std::size(kGridEntityHandleRows)), 0) && all;
 		all = PluginMap::ResolveField(scanner, self, GridEntityData, kGridEntityDataRows,
-			static_cast<uint32_t>(std::size(kGridEntityDataRows))) && all;
+			static_cast<uint32_t>(std::size(kGridEntityDataRows)), 0) && all;
 		all = PluginMap::ResolveField(scanner, self, TransformTranslation, kTransformTranslationRows,
-			static_cast<uint32_t>(std::size(kTransformTranslationRows))) && all;
+			static_cast<uint32_t>(std::size(kTransformTranslationRows)), 0) && all;
 		return all;
 	}
 }
