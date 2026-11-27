@@ -10,6 +10,7 @@
 
 #include "Engine_classes.hpp"
 #include "plugin_map.h"
+#include "plugin_go_to_item.h"
 
 #include <algorithm>
 #include <array>
@@ -20,8 +21,12 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
+#include <mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace ProductionUI
@@ -31,6 +36,47 @@ namespace ProductionUI
 		// Mirrors ImGuiCol_ values from imgui.h so we don't need to depend on
 		// the ImGui headers directly.
 		constexpr int ImGuiCol_Button = 21;
+
+		// With the Go to Item plugin, a production row's Go button hands the item
+		// and base to it; otherwise Go points our own waypoint at the base. Go to
+		// Item's calls are for the game thread only, so the window never makes
+		// one: each frame it publishes the item keys it shows and stores a click,
+		// and Tick publishes which of those keys Go to Item can take and why a
+		// click failed.
+		struct GoClick
+		{
+			std::string itemKey;
+			uint64_t baseKey = 0;  // 0 = no click waiting
+			uint32_t world = 0;    // g_goWorld when the clicked row was read
+		};
+
+		struct GoFailure
+		{
+			std::string itemKey;
+			uint64_t baseKey = 0;  // 0 = nothing failed
+			std::string text;
+		};
+
+		std::mutex g_goMutex;                        // guards the five below
+		std::vector<std::string> g_goWanted;         // item keys of the last frame's production Go buttons
+		std::chrono::steady_clock::time_point g_goWantedAt{};
+		std::unordered_set<std::string> g_goReady;   // of those, the keys Go to Item can take
+		GoClick g_goClick;
+		GoFailure g_goFailure;                       // cleared by the next Go to Item click
+		std::atomic<uint32_t> g_goWorld{ 0 };        // ResetGo counts it up
+		size_t g_goNextCheck = 0;                    // Tick only
+
+		// The window counts as shown while it published keys this recently.
+		constexpr std::chrono::milliseconds kGoShownFor{ 1000 };
+		// The most shown items Tick asks about in one tick; the rest follow.
+		constexpr size_t kGoChecksPerTick = 8;
+
+		// Window callback only: this frame's copy of what Tick published, the keys
+		// this frame shows, and g_goWorld as it was when s_cachedItems was read.
+		std::unordered_set<std::string> s_goReady;
+		GoFailure s_goFailure;
+		std::vector<std::string> s_goShownKeys;
+		uint32_t s_cachedWorld = 0;
 
 		PanelHandle g_panel = nullptr;
 		IPluginSelf* g_self = nullptr;
@@ -74,6 +120,7 @@ namespace ProductionUI
 			auto now = std::chrono::steady_clock::now();
 			if (rangeIndex != s_cachedRangeIndex || now - s_lastRefreshTime >= kRefreshInterval)
 			{
+				s_cachedWorld = g_goWorld.load();  // taken before the read
 				s_cachedItems = ProductionTracker::GetItemsCategory(range);
 				s_cachedRangeIndex = rangeIndex;
 				s_lastRefreshTime = now;
@@ -228,6 +275,51 @@ namespace ProductionUI
 			}
 		}
 
+		// Go through Go to Item. A click is only stored; Tick acts on it.
+		void RenderGoToItemButton(IModLoaderImGui* imgui, const std::string& itemKey, const std::string& itemName,
+			uint64_t baseKey, const std::string& baseName)
+		{
+			// The same base can be listed under several expanded items.
+			const std::string goId = "Go##goto_" + itemKey + "_" + std::to_string(baseKey);
+			if (imgui->SmallButton(goId.c_str()))
+			{
+				s_goFailure = {};
+				std::lock_guard<std::mutex> lock(g_goMutex);
+				g_goClick = { itemKey, baseKey, s_cachedWorld };
+				g_goFailure = {};
+			}
+			if (imgui->IsItemHovered())
+			{
+				std::string goTip = "Tracks " + itemName + " in Go to Item and points to " + baseName;
+				if (s_goFailure.baseKey == baseKey && s_goFailure.itemKey == itemKey)
+					goTip += "\nNot tracked: " + s_goFailure.text;
+				imgui->SetTooltip(goTip.c_str());
+			}
+		}
+
+		// Go through our own waypoint.
+		void RenderWaypointButton(IModLoaderImGui* imgui, uint64_t baseKey, const std::string& baseName)
+		{
+			std::string goId = "Go##waypoint_" + std::to_string(baseKey);
+			const bool waypointOn = ProductionWaypoint::IsOn();
+			imgui->BeginDisabled(!waypointOn);
+			if (imgui->SmallButton(goId.c_str()))
+			{
+				{
+					// The latest click wins over one still waiting for Go to Item.
+					std::lock_guard<std::mutex> lock(g_goMutex);
+					g_goClick = {};
+				}
+				ProductionWaypoint::SetTarget(baseKey, baseName);
+			}
+			imgui->EndDisabled();
+			if (!waypointOn)
+			{
+				imgui->SameLine(0.0f, -1.0f);
+				imgui->TextDisabled("(waypoint unavailable)");
+			}
+		}
+
 		// Renders the scrollable item list: name, history sparkline, running total, rate/min.
 		// Returns the name of the entry whose row is currently hovered, or an empty
 		// string if none is.
@@ -351,18 +443,17 @@ namespace ProductionUI
 						// "Unknown Location" (baseKey 0) has nothing to point at.
 						if (base.baseKey != 0 && base.distanceMeters >= 0.0f)
 						{
+							// Consumption rows have no itemKey.
+							if (!entry.itemKey.empty() && (s_goShownKeys.empty() || s_goShownKeys.back() != entry.itemKey))
+								s_goShownKeys.push_back(entry.itemKey);
+
 							imgui->SameLine(0.0f, 8.0f);
-							std::string goId = "Go##waypoint_" + std::to_string(base.baseKey);
-							const bool waypointOn = ProductionWaypoint::IsOn();
-							imgui->BeginDisabled(!waypointOn);
-							if (imgui->SmallButton(goId.c_str()))
-								ProductionWaypoint::SetTarget(base.baseKey, base.baseName);
-							imgui->EndDisabled();
-							if (!waypointOn)
-							{
-								imgui->SameLine(0.0f, -1.0f);
-								imgui->TextDisabled("(waypoint unavailable)");
-							}
+							// The one place that picks what Go does: Go to Item where
+							// Tick said it can take this item, else our own waypoint.
+							if (s_goReady.count(entry.itemKey) != 0)
+								RenderGoToItemButton(imgui, entry.itemKey, entry.name, base.baseKey, base.baseName);
+							else
+								RenderWaypointButton(imgui, base.baseKey, base.baseName);
 						}
 
 						imgui->TableNextColumn();
@@ -596,6 +687,13 @@ namespace ProductionUI
 			if (!RenderNetStatus(imgui))
 				return;
 
+			s_goShownKeys.clear();
+			{
+				std::lock_guard<std::mutex> lock(g_goMutex);
+				s_goReady = g_goReady;
+				s_goFailure = g_goFailure;
+			}
+
 			const auto& items = GetCachedItems(ranges[s_selectedRangeIndex].value, s_selectedRangeIndex);
 			std::vector<std::string> searchTerms = ParseSearchTerms(s_searchBuffer);
 			std::vector<ProductionData::Entry> production = FilterEntries(items.production, searchTerms);
@@ -631,10 +729,105 @@ namespace ProductionUI
 			}
 			imgui->EndChild();
 
+			{
+				std::lock_guard<std::mutex> lock(g_goMutex);
+				g_goWanted.swap(s_goShownKeys);
+				g_goWantedAt = std::chrono::steady_clock::now();
+			}
+
 			imgui->Separator();
 			imgui->SetNextItemWidth(-1.0f);
 			imgui->InputTextWithHint("##ProductionViewer_Search", "Search items (comma-separated, e.g. wolf,tube,ore)",
 				s_searchBuffer, sizeof(s_searchBuffer));
+		}
+
+		// Drops the waiting click and what was published. g_goMutex is held.
+		void ForgetGoLocked()
+		{
+			g_goReady.clear();
+			g_goClick = {};
+			g_goFailure = {};
+		}
+
+		// Game thread. Asks Go to Item which shown items it can take and acts on a
+		// waiting click. Nothing is called while no production row with a Go button
+		// is shown. One tick costs at most one GetIfOn, kGoChecksPerTick CanTrack
+		// and, for a click, TrackItem and then SelectSource or ResultToString.
+		void TickGo()
+		{
+			GoClick click;
+			std::vector<std::string> check;
+			{
+				std::lock_guard<std::mutex> lock(g_goMutex);
+				// Base keys come from the base cores; our waypoint is not needed.
+				if (g_goWanted.empty() || std::chrono::steady_clock::now() - g_goWantedAt >= kGoShownFor ||
+					!ProductionViewerFields::BaseCores.On())
+				{
+					ForgetGoLocked();
+					return;
+				}
+
+				for (auto it = g_goReady.begin(); it != g_goReady.end();)
+				{
+					const bool shown = std::find(g_goWanted.begin(), g_goWanted.end(), *it) != g_goWanted.end();
+					it = shown ? std::next(it) : g_goReady.erase(it);
+				}
+
+				const size_t count = (std::min)(kGoChecksPerTick, g_goWanted.size());
+				for (size_t i = 0; i < count; ++i)
+					check.push_back(g_goWanted[g_goNextCheck++ % g_goWanted.size()]);
+				click = std::exchange(g_goClick, {});
+			}
+
+			// Taken again on every tick and never kept: GoToItem can be unloaded
+			// between ticks. Our lock is not held across a call into it.
+			const GoToItemApi* api = GoToItem::GetIfOn();
+			if (!api)
+			{
+				std::lock_guard<std::mutex> lock(g_goMutex);
+				ForgetGoLocked();
+				return;
+			}
+
+			std::vector<std::pair<std::string, bool>> answers;
+			for (std::string& itemKey : check)
+			{
+				const int32_t can = api->CanTrack(itemKey.c_str());
+				answers.emplace_back(std::move(itemKey), can == GOTO_OK || can == GOTO_NO_LOCATION_YET);
+			}
+
+			bool clickDone = false;
+			GoFailure failure;
+			if (click.baseKey != 0 && click.world == g_goWorld.load())
+			{
+				clickDone = true;
+				const int32_t tracked = api->TrackItem(click.itemKey.c_str());
+				if (tracked < GOTO_OK)
+				{
+					// A copy: the text lives in GoToItem.dll.
+					const char* reason = api->ResultToString(tracked);
+					failure = { click.itemKey, click.baseKey, reason ? reason : "" };
+				}
+				else
+				{
+					// Go to Item keeps a pick for a base it has not seen yet; the
+					// nearest base stands in until that one appears.
+					api->SelectSource(click.itemKey.c_str(), click.baseKey);
+					// One click, one marker.
+					ProductionWaypoint::Clear();
+				}
+			}
+
+			std::lock_guard<std::mutex> lock(g_goMutex);
+			for (auto& [itemKey, can] : answers)
+			{
+				if (can)
+					g_goReady.insert(std::move(itemKey));
+				else
+					g_goReady.erase(itemKey);
+			}
+			if (clickDone)
+				g_goFailure = std::move(failure);
 		}
 
 		void OnPanelClosed(PanelHandle handle)
@@ -724,6 +917,16 @@ namespace ProductionUI
 			g_panelOpen = false;
 		}
 		g_viewerWasOn = on;
+
+		TickGo();
+	}
+
+	void ResetGo()
+	{
+		std::lock_guard<std::mutex> lock(g_goMutex);
+		++g_goWorld;
+		g_goWanted.clear();
+		ForgetGoLocked();
 	}
 
 	void Shutdown(IPluginSelf* self)
@@ -749,6 +952,7 @@ namespace ProductionUI
 			g_panel = nullptr;
 		}
 
+		ResetGo();
 		g_panelOpen = false;
 		g_self = nullptr;
 	}

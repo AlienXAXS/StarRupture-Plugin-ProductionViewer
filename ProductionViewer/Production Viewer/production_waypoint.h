@@ -37,6 +37,9 @@ namespace ProductionWaypoint
 	// The world is ending. A target kept while the waypoint is off is dropped.
 	void OnSessionEnded();
 
+	// Drops the target, if any, and hides the overlay. Game thread only.
+	void Clear();
+
 	// Starts navigating to the given base core (key from
 	// ProductionBaseCore::PackHandle) and shows the overlay. Replaces any
 	// previously active target.

@@ -29,6 +29,7 @@ namespace ProductionData
 	struct Entry
 	{
 		std::string name;
+		std::string itemKey;                        // UniqueItemName, else the class name without "_C"; production rows only (for Go to Item)
 		float total;                                // total over the selected time range
 		float ratePerMinute;                        // current rate
 		std::array<float, kHistorySamples> history;            // sparkline data (raw bucket amounts), oldest -> newest

@@ -262,6 +262,16 @@ namespace ProductionWaypoint
 		ClearIfPausedLocked();
 	}
 
+	void Clear()
+	{
+		{
+			std::lock_guard<std::mutex> lock(g_mutex);
+			g_paused = false;
+			g_waypoint.Clear();
+		}
+		HideWidget();
+	}
+
 	void Tick()
 	{
 		const bool on = IsOn();

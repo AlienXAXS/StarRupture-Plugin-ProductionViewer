@@ -474,6 +474,9 @@ namespace ProductionTracker
 		ProductionBaseCore::OnSessionLoaded();
 		ProductionWaypoint::OnSessionLoaded();
 
+		// After the clear above: a Go click on a row read before it is dropped.
+		ProductionUI::ResetGo();
+
 		// Clients are told to drop what they hold; the restore itself waits for
 		// the session role (see ServiceDeferredSessionLoad).
 		ProductionNet::OnSessionLoaded();
@@ -485,6 +488,7 @@ namespace ProductionTracker
 		// role, and is not written again once the role is gone.
 		SaveToSession();
 		ProductionWaypoint::OnSessionEnded();
+		ProductionUI::ResetGo();
 		ProductionNet::OnSessionEnded();
 	}
 
@@ -548,6 +552,7 @@ namespace ProductionTracker
 				{
 					Entry entry;
 					entry.name = record.displayName;
+					entry.itemKey = key;
 					entry.total = record.production.GetTotal(range);
 					entry.ratePerMinute = record.production.GetRatePerMinute(TimeRange::Minutes1);
 					entry.history = record.production.GetHistory(range);
